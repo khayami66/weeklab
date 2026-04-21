@@ -66,14 +66,40 @@ interface LessonMaster {
 
 ### 2.2 教員個人設定層
 
+#### `GradeConfig`
+```ts
+interface GradeConfig {
+  grade: number;         // 3, 4 など
+  class_count: number;   // そのクラスの組数
+  pack_id: string;       // "keirinkan.science.grade3"
+}
+```
+
 #### `TeacherSetting`
 ```ts
 interface TeacherSetting {
-  school_year: number;       // 年度（例：2026）
+  school_year: number;            // 年度（例：2026）
   school_name: string;
   teacher_name: string;
-  start_date: string;        // 当該年度の始業式日 "YYYY-MM-DD"
-  active_packs: string[];    // ["keirinkan.science.grade3", ...]
+  start_date: string;             // 当該年度の始業式日 "YYYY-MM-DD"
+  grade_configs: GradeConfig[];   // 学年×クラス数×パックの構成
+}
+```
+
+**備考**：「使用中のパックID一覧（active_packs）」は `grade_configs.map(g => g.pack_id)` で派生できるため、別フィールドとして持たない（Single Source of Truth）。
+
+ヘルパー：
+```ts
+function getActivePacks(setting: TeacherSetting): string[] {
+  return [...new Set(setting.grade_configs.map((g) => g.pack_id))];
+}
+
+function generateInitialClassProgress(
+  gradeConfigs: GradeConfig[]
+): ClassProgress[] {
+  // 各 grade_config から class_count 個の ClassProgress を生成
+  // 例: { grade:3, class_count:3, pack_id:"..." } → 3-1, 3-2, 3-3 の3件
+  // 初期値: current_unit_name="理科のガイダンス", completed_hours=0
 }
 ```
 

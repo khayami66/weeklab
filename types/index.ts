@@ -50,12 +50,26 @@ export interface LessonMaster {
 // 2. 教員個人設定層
 // ============================================================
 
+export interface GradeConfig {
+  grade: number; // 3, 4 など
+  class_count: number; // そのクラスの組数
+  pack_id: string; // "keirinkan.science.grade3"
+}
+
 export interface TeacherSetting {
   school_year: number; // 例：2026
   school_name: string;
   teacher_name: string;
   start_date: string; // "YYYY-MM-DD"
-  active_packs: string[]; // ["keirinkan.science.grade3", ...]
+  grade_configs: GradeConfig[];
+}
+
+/**
+ * 使用中のパックID一覧を grade_configs から派生
+ * （Single Source of Truth: active_packs フィールドは持たない）
+ */
+export function getActivePacks(setting: TeacherSetting): string[] {
+  return [...new Set(setting.grade_configs.map((g) => g.pack_id))];
 }
 
 export type Weekday = "月" | "火" | "水" | "木" | "金" | "土";

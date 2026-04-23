@@ -1,6 +1,33 @@
 import type { ClassProgress, GradeConfig } from "@/types";
 
 /**
+ * 既存 ClassProgress を新しい grade_configs に同期する。
+ *
+ * - `grade_configs` に存在するクラスで既存 progress があれば、その進度を維持
+ *   （ただし pack_id が変わっていれば進度リセット：カリキュラムが異なるため）
+ * - `grade_configs` に新規追加されたクラスは、初期値（理科のガイダンス・0時間）で追加
+ * - `grade_configs` から削除されたクラスは、結果配列から除外（データは失われる）
+ *
+ * 呼び出し側は保存前に「クラス削除を伴うか」を判断し、ユーザー確認を取ること。
+ */
+export function syncClassProgress(
+  current: ClassProgress[],
+  gradeConfigs: GradeConfig[]
+): ClassProgress[] {
+  const currentMap = new Map(current.map((p) => [p.class_code, p]));
+  const expected = generateInitialClassProgress(gradeConfigs);
+
+  return expected.map((e) => {
+    const existing = currentMap.get(e.class_code);
+    if (existing && existing.pack_id === e.pack_id) {
+      return existing; // 進度を維持
+    }
+    return e; // 新規 or pack変更 → 初期値
+  });
+}
+
+
+/**
  * `grade_configs` から `ClassProgress[]` を動的生成するヘルパー。
  *
  * 例：

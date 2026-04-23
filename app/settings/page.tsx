@@ -2,18 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import TimetableEditor from "@/components/TimetableEditor";
 import Toast from "@/components/Toast";
 import { useClassProgress } from "@/hooks/useClassProgress";
 import { useSetting } from "@/hooks/useSetting";
+import { useTimetable } from "@/hooks/useTimetable";
 import { syncClassProgress } from "@/data/user/initialClassProgress";
 import { localDataSource } from "@/lib/datasource/localDataSource";
-import type { CurriculumPack, GradeConfig, TeacherSetting } from "@/types";
+import type { CurriculumPack, GradeConfig, TeacherSetting, Timetable } from "@/types";
 
 export default function SettingsPage() {
   const { setting, loading: settingLoading, save: saveSetting } = useSetting();
   const { progress, save: saveProgress } = useClassProgress();
+  const { timetable, loading: timetableLoading, save: saveTimetable } = useTimetable();
 
   const [draft, setDraft] = useState<TeacherSetting | null>(null);
+  const [timetableDraft, setTimetableDraft] = useState<Timetable[] | null>(null);
   const [allPacks, setAllPacks] = useState<CurriculumPack[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [toastKind, setToastKind] = useState<"success" | "info" | "error">("success");
@@ -27,12 +31,21 @@ export default function SettingsPage() {
     if (setting && !draft) setDraft(structuredClone(setting));
   }, [setting, draft]);
 
-  const isDirty = useMemo(() => {
-    if (!setting || !draft) return false;
-    return JSON.stringify(setting) !== JSON.stringify(draft);
-  }, [setting, draft]);
+  useEffect(() => {
+    if (!timetableLoading && timetableDraft === null) {
+      setTimetableDraft(structuredClone(timetable));
+    }
+  }, [timetable, timetableLoading, timetableDraft]);
 
-  if (settingLoading || !draft || !setting) {
+  const isDirty = useMemo(() => {
+    if (!setting || !draft || timetableDraft === null) return false;
+    return (
+      JSON.stringify(setting) !== JSON.stringify(draft) ||
+      JSON.stringify(timetable) !== JSON.stringify(timetableDraft)
+    );
+  }, [setting, draft, timetable, timetableDraft]);
+
+  if (settingLoading || !draft || !setting || timetableLoading || timetableDraft === null) {
     return (
       <div>
         <PageHeader title="設定" />
@@ -106,6 +119,18 @@ export default function SettingsPage() {
       await saveSetting(draft);
       const syncedProgress = syncClassProgress(progress, draft.grade_configs);
       await saveProgress(syncedProgress);
+
+      // 時間割も保存：grade_configs から消えたクラスの時限は自動削除
+      const validClassCodes = new Set<string>();
+      for (const gc of draft.grade_configs) {
+        for (let i = 1; i <= gc.class_count; i++) {
+          validClassCodes.add(`${gc.grade}-${i}`);
+        }
+      }
+      const cleanedTimetable = timetableDraft.filter((t) => validClassCodes.has(t.class_code));
+      await saveTimetable(cleanedTimetable);
+      setTimetableDraft(cleanedTimetable);
+
       setToastKind("success");
       setToast("設定を保存しました");
     } catch (err) {
@@ -118,6 +143,7 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     setDraft(structuredClone(setting));
+    setTimetableDraft(structuredClone(timetable));
   };
 
   return (
@@ -283,6 +309,25 @@ export default function SettingsPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* 基本時間割 */}
+      <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">基本時間割</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            月〜土 × 1〜6限のマトリクスで、各コマで担当するクラスを選択します。
+            空欄は授業なし。週ごとの例外（休講／差し替え／追加）は週案画面で設定してください。
+          </p>
+        </div>
+        <div className="mt-4">
+          <TimetableEditor
+            timetable={timetableDraft}
+            gradeConfigs={draft.grade_configs}
+            teacherType={draft.teacher_type}
+            onChange={setTimetableDraft}
+          />
         </div>
       </section>
 

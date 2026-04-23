@@ -89,7 +89,15 @@ export const localDataSource: DataSource = {
   async getSetting(): Promise<TeacherSetting> {
     const year = readCurrentYear();
     const stored = getItem<TeacherSetting | null>(yearKey(year, "teacher_setting"), null);
-    if (stored) return stored;
+    if (stored) {
+      // レガシーデータ互換：teacher_type が未設定のデータ（2026-04-23 以前保存）には
+      // デフォルトの "specialist" を補完して再保存
+      if (!stored.teacher_type) {
+        stored.teacher_type = "specialist";
+        setItem(yearKey(year, "teacher_setting"), stored);
+      }
+      return stored;
+    }
 
     // 初回：initialSetting を保存して返す
     setItem(yearKey(year, "teacher_setting"), initialSetting);

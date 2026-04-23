@@ -166,6 +166,23 @@ export default function SettingsPage() {
             />
             <p className="mt-1 text-xs text-slate-500">週番号算出の起点になります</p>
           </Field>
+          <Field label="教員タイプ">
+            <select
+              value={draft.teacher_type}
+              onChange={(e) =>
+                updateField("teacher_type", e.target.value as "specialist" | "homeroom")
+              }
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="specialist">専科教員（時間割でクラスを選択）</option>
+              <option value="homeroom" disabled>
+                担任教員（将来対応）
+              </option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              MVP では専科教員のみ対応。担任教員モードは将来実装予定
+            </p>
+          </Field>
         </div>
       </section>
 

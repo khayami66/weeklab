@@ -75,12 +75,20 @@ interface GradeConfig {
 }
 ```
 
+#### `TeacherType`
+```ts
+type TeacherType = "specialist" | "homeroom";
+// specialist : 専科教員（MVP対象）。時間割でコマごとに「クラス」を選ぶ
+// homeroom   : 担任教員（将来対応）。時間割でコマごとに「教科」を選ぶ
+```
+
 #### `TeacherSetting`
 ```ts
 interface TeacherSetting {
   school_year: number;            // 年度（例：2026）
   school_name: string;
   teacher_name: string;
+  teacher_type: TeacherType;      // 専科 / 担任
   start_date: string;             // 当該年度の始業式日 "YYYY-MM-DD"
   grade_configs: GradeConfig[];   // 学年×クラス数×パックの構成
 }

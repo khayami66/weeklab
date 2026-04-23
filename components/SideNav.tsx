@@ -4,7 +4,6 @@ const items = [
   { href: "/", label: "ホーム" },
   { href: "/weekly", label: "週案" },
   { href: "/progress", label: "進度管理" },
-  { href: "/timetable", label: "時間割・例外" },
   { href: "/monthly", label: "月次集計" },
   { href: "/master", label: "マスタ" },
   { href: "/archive", label: "アーカイブ" },

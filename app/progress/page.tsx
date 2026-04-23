@@ -134,9 +134,18 @@ export default function ProgressPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="進度管理"
+        title="進度管理（補正用）"
         subtitle={`第 ${currentWeekNo} 週時点での進捗状況（期待累計＝年間配当時数 × ${currentWeekNo}/${TOTAL_WEEKS}）`}
       />
+
+      {/* 位置づけ案内バナー */}
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        <p className="font-semibold">この画面は補正用です</p>
+        <p className="mt-1 text-blue-700">
+          通常の進度更新は <b>週案画面の「今週を実施済みに確定」ボタン</b>（Phase 12 実装予定）で自動反映されます。
+          校外学習・出張・単元の前後入れ替えなど、<b>イレギュラーな補正が必要な場合のみ</b>こちらで直接編集してください。
+        </p>
+      </section>
 
       {/* 全体サマリ */}
       {draft.length > 0 && (

@@ -56,10 +56,18 @@ export interface GradeConfig {
   pack_id: string; // "keirinkan.science.grade3"
 }
 
+/**
+ * 教員のタイプ。将来の担任対応を見越して型のみ先に確保。
+ * - specialist: 専科教員（MVP対象）。時間割でコマごとに「クラス」を選ぶ
+ * - homeroom : 担任教員（将来）。時間割でコマごとに「教科」を選ぶ
+ */
+export type TeacherType = "specialist" | "homeroom";
+
 export interface TeacherSetting {
   school_year: number; // 例：2026
   school_name: string;
   teacher_name: string;
+  teacher_type: TeacherType;
   start_date: string; // "YYYY-MM-DD"
   grade_configs: GradeConfig[];
 }

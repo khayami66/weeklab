@@ -15,6 +15,7 @@ export const testSetting: TeacherSetting = {
   school_year: 2026,
   school_name: "テスト小学校",
   teacher_name: "テスト教員",
+  teacher_type: "specialist",
   start_date: "2026-04-06",
   grade_configs: [
     { grade: 3, class_count: 1, pack_id: "test.grade3" },

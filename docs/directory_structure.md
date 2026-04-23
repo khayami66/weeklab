@@ -10,16 +10,16 @@ weeklab/
 │   ├── layout.tsx                        # ルートレイアウト
 │   ├── page.tsx                          # ホーム /
 │   ├── globals.css
-│   ├── weekly/page.tsx                   # 週案生成
+│   ├── weekly/page.tsx                   # 週案生成＋週内例外＋「今週を実施済みに確定」
 │   ├── print/
 │   │   ├── weekly/page.tsx               # 週案印刷
 │   │   └── monthly/page.tsx              # 月次集計印刷
-│   ├── progress/page.tsx                 # 進度管理
-│   ├── timetable/page.tsx                # 時間割・例外
-│   ├── settings/page.tsx                 # 設定・年度切替・エクスポート
+│   ├── progress/page.tsx                 # 進度管理（補正用）
+│   ├── settings/page.tsx                 # 設定：基本情報＋学年構成＋基本時間割＋年度切替＋エクスポート
 │   ├── monthly/page.tsx                  # 月次集計（教育委員会報告用）
 │   ├── archive/page.tsx                  # アーカイブ閲覧
 │   └── master/page.tsx                   # マスタ確認
+│                                         # ※ /timetable は廃止（基本時間割→/settings、週内例外→/weekly）
 │
 ├── components/                           # 再利用UIコンポーネント
 │   ├── Header.tsx
@@ -39,6 +39,7 @@ weeklab/
 │   ├── MasterTable.tsx
 │   ├── HealthBadge.tsx                   # 進度ヘルス表示
 │   ├── FirstLessonConfirmRow.tsx         # 週先頭コマ確定1行
+│   ├── TimetableEditor.tsx               # 基本時間割マトリクス編集（設定画面内）
 │   ├── MonthlyTable.tsx                  # 月次集計テーブル
 │   ├── Badge.tsx
 │   └── Toast.tsx

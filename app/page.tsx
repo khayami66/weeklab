@@ -139,14 +139,14 @@ export default function HomePage() {
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
           <h2 className="text-sm font-semibold text-amber-800">時間割が未登録です</h2>
           <p className="mt-1 text-sm text-amber-700">
-            「時間割・例外」画面で自校の理科専科時間割を入力すると、
+            設定画面の「基本時間割」セクションで自校の時間割を入力すると、
             今日の授業と週案が自動で表示されます。
           </p>
           <Link
-            href="/timetable"
+            href="/settings"
             className="mt-3 inline-block rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
           >
-            時間割画面を開く →
+            設定画面を開く →
           </Link>
         </section>
       )}
@@ -201,7 +201,7 @@ export default function HomePage() {
           {[
             { href: "/weekly", label: "週案" },
             { href: "/progress", label: "進度管理" },
-            { href: "/timetable", label: "時間割" },
+            { href: "/settings", label: "設定" },
             { href: "/monthly", label: "月次集計" },
             { href: `/print/weekly?week=${mondayKey}`, label: "🖨 印刷" },
             { href: "/archive", label: "アーカイブ" },

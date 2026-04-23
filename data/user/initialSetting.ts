@@ -13,6 +13,7 @@ export const initialSetting: TeacherSetting = {
   school_year: 2026,
   school_name: "松戸市立梨香台小学校",
   teacher_name: "速見公宏",
+  teacher_type: "specialist",
   start_date: "2026-04-06",
   grade_configs: [
     { grade: 3, class_count: 3, pack_id: "keirinkan.science.grade3" },

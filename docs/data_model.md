@@ -320,7 +320,7 @@ function computeMonthSummary(
 
 function checkProgressHealth(
   progress: ClassProgress[],
-  annualPlan: AnnualPlan[],
+  annualPlanByPack: Record<string, AnnualPlan[]>,   // pack_id → AnnualPlan[]
   currentWeekNo: number,
   totalWeeks: number
 ): ProgressHealth[];

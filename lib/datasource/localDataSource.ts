@@ -28,6 +28,7 @@ import {
   META_YEARS_KEY,
   archiveMetaKey,
   archiveWeeksKey,
+  confirmedWeeksKey,
   firstLessonKey,
   getItem,
   listKeys,
@@ -179,6 +180,29 @@ export const localDataSource: DataSource = {
   ): Promise<void> {
     const year = readCurrentYear();
     setItem(firstLessonKey(year, monday_date), confirms);
+  },
+
+  // ── 実施済み確定週 ─────────────────────────────────
+  async getConfirmedWeeks(): Promise<string[]> {
+    const year = readCurrentYear();
+    return getItem<string[]>(confirmedWeeksKey(year), []);
+  },
+
+  async addConfirmedWeek(monday_date: string): Promise<void> {
+    const year = readCurrentYear();
+    const current = getItem<string[]>(confirmedWeeksKey(year), []);
+    if (!current.includes(monday_date)) {
+      setItem(confirmedWeeksKey(year), [...current, monday_date].sort());
+    }
+  },
+
+  async removeConfirmedWeek(monday_date: string): Promise<void> {
+    const year = readCurrentYear();
+    const current = getItem<string[]>(confirmedWeeksKey(year), []);
+    setItem(
+      confirmedWeeksKey(year),
+      current.filter((d) => d !== monday_date)
+    );
   },
 
   // ── 年度管理 ───────────────────────────────────────

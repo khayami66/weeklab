@@ -73,6 +73,11 @@ export function firstLessonKey(year: number, mondayDate: string): string {
   return `weeklab.${year}.first_lesson.${mondayDate}`;
 }
 
+/** 実施済み確定週リスト：weeklab.{year}.confirmed_weeks */
+export function confirmedWeeksKey(year: number): string {
+  return `weeklab.${year}.confirmed_weeks`;
+}
+
 /** アーカイブメタ：weeklab.archive.{year}.meta */
 export function archiveMetaKey(year: number): string {
   return `weeklab.archive.${year}.meta`;

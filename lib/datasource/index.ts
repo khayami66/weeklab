@@ -47,6 +47,11 @@ export interface DataSource {
   getFirstLessonConfirms(monday_date: string): Promise<FirstLessonConfirm[]>;
   saveFirstLessonConfirms(monday_date: string, confirms: FirstLessonConfirm[]): Promise<void>;
 
+  // ── 実施済み確定週（二重確定防止） ──
+  getConfirmedWeeks(): Promise<string[]>; // monday_date の配列
+  addConfirmedWeek(monday_date: string): Promise<void>;
+  removeConfirmedWeek(monday_date: string): Promise<void>;
+
   // ── 年度管理 ──
   getCurrentYear(): Promise<number>;
   setCurrentYear(year: number): Promise<void>;

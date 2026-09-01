@@ -177,7 +177,95 @@ export interface MonthlySummary {
 }
 
 // ============================================================
-// 4. アーカイブ・エクスポート
+// 4. 成績層（grading_design.md）
+// ============================================================
+
+/**
+ * 評価の観点。
+ * - knowledge: 知識・技能
+ * - thinking : 思考・判断・表現
+ * - attitude : 主体的に学習に取り組む態度
+ *              （ペーパーテストでは測れないため MVP では未使用。型のみ確保）
+ */
+export type ViewPoint = "knowledge" | "thinking" | "attitude";
+
+export type GradeLevel = "A" | "B" | "C";
+
+/**
+ * 業者の単元テストの定義。単元（AnnualPlan.unit_name）に紐づく。
+ * max_* が 0 の観点は「そのテストでは出題されない」ことを表す。
+ *
+ * 採択は学校ごとのローカル事情なので、全国共有資産である
+ * カリキュラムパックには含めず、ユーザーデータとして持つ。
+ */
+export interface TestMaster {
+  test_id: string; // "keirinkan.science.grade3.kaze-gomu"
+  pack_id: string; // "keirinkan.science.grade3"
+  unit_name: string; // AnnualPlan.unit_name と一致させる
+  test_name: string;
+  max_knowledge: number; // 知識・技能の満点（0 = 出題なし）
+  max_thinking: number; // 思考・判断・表現の満点（0 = 出題なし）
+  note: string;
+}
+
+/**
+ * 1人・1テスト分の得点。
+ * 未受験は null。0点と区別し、通算の分子・分母の両方から除外する。
+ */
+export interface TestScore {
+  student_no: number; // 出席番号
+  knowledge: number | null;
+  thinking: number | null;
+}
+
+/** 1クラス・1テスト分の実施記録 */
+export interface TestResult {
+  test_id: string;
+  class_code: string;
+  conducted_on: string; // "YYYY-MM-DD" 実施日。集計期間の判定に使う
+  scores: TestScore[];
+}
+
+/** 観点ごとの A/B/C 判定閾値（%）。固定値ではなく設定画面で変更する */
+export interface GradeThreshold {
+  viewpoint: ViewPoint;
+  a_min: number; // A の下限（%）初期値 90
+  b_min: number; // B の下限（%）初期値 60。これ未満が C
+}
+
+/** 1観点分の通算結果。max が 0（＝全テスト未受験・出題なし）なら判定不能 */
+export interface ViewPointResult {
+  viewpoint: ViewPoint;
+  earned: number; // 通算獲得点
+  max: number; // 通算満点（未受験分を除く）
+  rate: number | null; // earned / max（0-1）。max === 0 なら null
+  grade: GradeLevel | null; // 判定不能なら null（画面では "—"）
+  test_count: number; // 通算に含めたテスト数
+}
+
+export interface StudentGrade {
+  class_code: string;
+  student_no: number;
+  by_viewpoint: ViewPointResult[];
+}
+
+/**
+ * 観点の偏り。既存の ProgressHealth と同じ形（level + message）にそろえる。
+ * gap は**パーセントポイント**で、負なら思考・判断・表現が弱い。
+ */
+export interface ViewpointBalance {
+  scope: "class" | "student";
+  class_code: string;
+  student_no: number | null; // scope === "class" なら null
+  knowledge_rate: number | null; // 得点率（0-1）
+  thinking_rate: number | null;
+  gap: number | null; // (thinking - knowledge) × 100 pt。片方が null なら null
+  level: HealthLevel;
+  message: string;
+}
+
+// ============================================================
+// 5. アーカイブ・エクスポート
 // ============================================================
 
 export interface ArchivedWeek {
@@ -211,6 +299,12 @@ export interface FullSnapshot {
       class_progress: ClassProgress[];
       memos: Record<string, string>; // key → memo text
       first_lesson_confirms: Record<string, FirstLessonConfirm[]>; // monday_date → confirms[]
+      // ── 成績層（v1.6 追加）──
+      // 既存のエクスポートJSONには存在しないため optional。
+      // インポート側は欠けていても壊れないこと。
+      test_masters?: TestMaster[];
+      grade_thresholds?: GradeThreshold[];
+      test_results?: TestResult[];
       archive_meta?: ArchiveMetadata;
       archived_weeks?: ArchivedWeek[];
     };

@@ -275,6 +275,27 @@ interface FullSnapshot {
 }
 ```
 
+### 2.5 成績層
+
+成績処理の型定義・ロジック・画面設計は **`grading_design.md` に分離**する
+（サブシステムとして独立性が高く、本書に混ぜると読みにくくなるため）。
+
+本書では型名のみ掲げる。詳細は `grading_design.md` §3 を参照。
+
+| 型 | 役割 | 層 |
+|---|---|---|
+| `ViewPoint` | 評価の観点（`knowledge` / `thinking` / `attitude`） | — |
+| `GradeLevel` | `"A" \| "B" \| "C"` | — |
+| `TestMaster` | 業者単元テストの定義（単元・観点別満点） | 個人設定層 |
+| （名簿の型は持たない） | 全クラス一律35行固定（定数 `ROSTER_ROWS`）。在籍人数は記録しない | — |
+| `TestScore` | 1人1テスト分の得点（未受験は `null`） | 個人設定層 |
+| `TestResult` | 1クラス1テスト分の実施記録（実施日＋全員分の得点） | 個人設定層 |
+| `GradeThreshold` | 観点ごとの A/B 下限（初期値 90/60） | 個人設定層 |
+| `ViewPointResult` / `StudentGrade` | 通算得点率と A/B/C 判定 | 派生 |
+| `ViewpointBalance` | 観点の偏り分析（`ProgressHealth` と同形） | 派生 |
+
+**成績データは児童の氏名を持たない。** 識別子は `class_code` ＋ `student_no`（出席番号）のみ。
+
 ## 3. データ関係図
 
 ```
@@ -406,6 +427,10 @@ function importAll(snapshot: FullSnapshot): Promise<void>;  // 全上書き
 | `ClassProgress` | `weeklab.{year}.class_progress_v1` |
 | 週案 `memo` | `weeklab.{year}.memo.{date}.{class_code}.{period}` |
 | 週先頭コマ確定 | `weeklab.{year}.first_lesson.{monday_date}` |
+| 実施済み確定週 | `weeklab.{year}.confirmed_weeks` |
+| `TestMaster` | `weeklab.{year}.test_master_v1` |
+| `GradeThreshold` | `weeklab.{year}.grade_thresholds_v1` |
+| `TestResult` | `weeklab.{year}.test_result.{test_id}.{class_code}` |
 | アーカイブメタ | `weeklab.archive.{year}.meta` |
 | アーカイブ週データ | `weeklab.archive.{year}.weeks` |
 
@@ -443,6 +468,15 @@ interface DataSource {
   listArchivedYears(): Promise<ArchiveMetadata[]>;
   getArchivedWeeks(year: number): Promise<ArchivedWeek[]>;
 
+  // 成績層（grading_design.md §7）
+  getTestMasters(): Promise<TestMaster[]>;
+  saveTestMasters(m: TestMaster[]): Promise<void>;
+  getGradeThresholds(): Promise<GradeThreshold[]>;
+  saveGradeThresholds(t: GradeThreshold[]): Promise<void>;
+  getTestResult(test_id: string, class_code: string): Promise<TestResult | null>;
+  saveTestResult(result: TestResult): Promise<void>;
+  listTestResults(): Promise<TestResult[]>;
+
   // エクスポート/インポート
   exportAll(): Promise<FullSnapshot>;
   importAll(snapshot: FullSnapshot): Promise<void>;
@@ -461,4 +495,6 @@ interface DataSource {
 | `LessonRecord` | 授業後の実施記録・反省 |
 | `ResearchNote` | 教材研究メモ |
 | `PrintTemplate` | 他自治体の印刷様式 |
-| `GradeSystemLink` | 成績システム連携の参照 |
+| `AttitudeRecord` | 第3観点（主体的に学習に取り組む態度）の材料。`grading_design.md` §9 参照 |
+
+> `GradeSystemLink`（外部成績システム連携）は廃止。成績処理は Weeklab に統合した（`grading_design.md` §1.1）。

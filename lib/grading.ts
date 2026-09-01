@@ -37,6 +37,13 @@ export const BALANCE_ALERT_PT = 20;
 /** テストで測る観点。attitude はペーパーテストでは測れないため含めない */
 export const SCORED_VIEWPOINTS: ViewPoint[] = ["knowledge", "thinking"];
 
+/** 画面表示用の観点名 */
+export const VIEWPOINT_LABELS: Record<ViewPoint, string> = {
+  knowledge: "知識・技能",
+  thinking: "思考・判断・表現",
+  attitude: "主体的に学習に取り組む態度",
+};
+
 /**
  * 得点率と閾値(%)を比較するときの許容誤差。
  * 45/50 のような値は二進小数で厳密に 0.9 にならず、

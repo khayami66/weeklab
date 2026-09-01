@@ -6,8 +6,10 @@ import type {
   CurriculumPack,
   FirstLessonConfirm,
   FullSnapshot,
+  GradeThreshold,
   LessonMaster,
   TeacherSetting,
+  TestMaster,
   Timetable,
   TimetableOverride,
 } from "@/types";
@@ -46,6 +48,14 @@ export interface DataSource {
   // ── 週先頭コマ確定 ──
   getFirstLessonConfirms(monday_date: string): Promise<FirstLessonConfirm[]>;
   saveFirstLessonConfirms(monday_date: string, confirms: FirstLessonConfirm[]): Promise<void>;
+
+  // ── 成績層：評定閾値・テストマスタ（grading_design.md §7） ──
+  getTestMasters(): Promise<TestMaster[]>;
+  saveTestMasters(m: TestMaster[]): Promise<void>;
+
+  /** 未保存なら既定値（全観点 90/60）を返す */
+  getGradeThresholds(): Promise<GradeThreshold[]>;
+  saveGradeThresholds(t: GradeThreshold[]): Promise<void>;
 
   // ── 実施済み確定週（二重確定防止） ──
   getConfirmedWeeks(): Promise<string[]>; // monday_date の配列

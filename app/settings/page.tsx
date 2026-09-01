@@ -1,23 +1,48 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import GradeThresholdEditor from "@/components/GradeThresholdEditor";
 import PageHeader from "@/components/PageHeader";
+import TestMasterEditor from "@/components/TestMasterEditor";
 import TimetableEditor from "@/components/TimetableEditor";
 import Toast from "@/components/Toast";
 import { useClassProgress } from "@/hooks/useClassProgress";
+import { useGradeThresholds } from "@/hooks/useGradeThresholds";
 import { useSetting } from "@/hooks/useSetting";
+import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTimetable } from "@/hooks/useTimetable";
 import { syncClassProgress } from "@/data/user/initialClassProgress";
 import { localDataSource } from "@/lib/datasource/localDataSource";
-import type { CurriculumPack, GradeConfig, TeacherSetting, Timetable } from "@/types";
+import { VIEWPOINT_LABELS } from "@/lib/grading";
+import type {
+  CurriculumPack,
+  GradeConfig,
+  GradeThreshold,
+  TeacherSetting,
+  TestMaster,
+  Timetable,
+} from "@/types";
 
 export default function SettingsPage() {
   const { setting, loading: settingLoading, save: saveSetting } = useSetting();
   const { progress, save: saveProgress } = useClassProgress();
   const { timetable, loading: timetableLoading, save: saveTimetable } = useTimetable();
+  const {
+    thresholds,
+    loading: thresholdsLoading,
+    save: saveThresholds,
+  } = useGradeThresholds();
+  const {
+    testMasters,
+    loading: testMastersLoading,
+    save: saveTestMasters,
+  } = useTestMasters();
 
   const [draft, setDraft] = useState<TeacherSetting | null>(null);
   const [timetableDraft, setTimetableDraft] = useState<Timetable[] | null>(null);
+  const [thresholdDraft, setThresholdDraft] = useState<GradeThreshold[] | null>(null);
+  const [testMasterDraft, setTestMasterDraft] = useState<TestMaster[] | null>(null);
+  const [unitsByPack, setUnitsByPack] = useState<Record<string, string[]>>({});
   const [allPacks, setAllPacks] = useState<CurriculumPack[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [toastKind, setToastKind] = useState<"success" | "info" | "error">("success");
@@ -27,25 +52,82 @@ export default function SettingsPage() {
     localDataSource.listPacks().then(setAllPacks);
   }, []);
 
-  useEffect(() => {
-    if (setting && !draft) setDraft(structuredClone(setting));
-  }, [setting, draft]);
+  // 読み込みが終わった時点で、編集用の draft を1度だけ作る。
+  // useEffect ではなくレンダー中に行うのが React の推奨（余分な再レンダーが減る）。
+  // 条件は draft が null のときだけなので、1回で収束して無限ループにはならない。
+  if (setting && draft === null) setDraft(structuredClone(setting));
+  if (!timetableLoading && timetableDraft === null) {
+    setTimetableDraft(structuredClone(timetable));
+  }
+  if (!thresholdsLoading && thresholdDraft === null) {
+    setThresholdDraft(structuredClone(thresholds));
+  }
+  if (!testMastersLoading && testMasterDraft === null) {
+    setTestMasterDraft(structuredClone(testMasters));
+  }
+
+  // テストマスタの単元セレクト用に、担当パックの年間指導計画から単元名を集める
+  const activePackIds = useMemo(
+    () => [...new Set((draft?.grade_configs ?? []).map((g) => g.pack_id).filter((id) => id !== ""))],
+    [draft?.grade_configs]
+  );
+  const activePackKey = activePackIds.join(",");
 
   useEffect(() => {
-    if (!timetableLoading && timetableDraft === null) {
-      setTimetableDraft(structuredClone(timetable));
+    const ids = activePackKey === "" ? [] : activePackKey.split(",");
+    let cancelled = false;
+    Promise.all(
+      ids.map(async (id): Promise<[string, string[]]> => {
+        const plan = await localDataSource.getAnnualPlan(id);
+        return [id, [...new Set(plan.map((p) => p.unit_name))]];
+      })
+    ).then((entries) => {
+      if (!cancelled) setUnitsByPack(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePackKey]);
+
+  const packLabels = useMemo(() => {
+    const labels: Record<string, string> = {};
+    for (const p of allPacks) {
+      labels[p.id] = `${p.grade}年 / ${p.publisher_label} ${p.subject_label}`;
     }
-  }, [timetable, timetableLoading, timetableDraft]);
+    return labels;
+  }, [allPacks]);
 
   const isDirty = useMemo(() => {
     if (!setting || !draft || timetableDraft === null) return false;
+    if (thresholdDraft === null || testMasterDraft === null) return false;
     return (
       JSON.stringify(setting) !== JSON.stringify(draft) ||
-      JSON.stringify(timetable) !== JSON.stringify(timetableDraft)
+      JSON.stringify(timetable) !== JSON.stringify(timetableDraft) ||
+      JSON.stringify(thresholds) !== JSON.stringify(thresholdDraft) ||
+      JSON.stringify(testMasters) !== JSON.stringify(testMasterDraft)
     );
-  }, [setting, draft, timetable, timetableDraft]);
+  }, [
+    setting,
+    draft,
+    timetable,
+    timetableDraft,
+    thresholds,
+    thresholdDraft,
+    testMasters,
+    testMasterDraft,
+  ]);
 
-  if (settingLoading || !draft || !setting || timetableLoading || timetableDraft === null) {
+  if (
+    settingLoading ||
+    !draft ||
+    !setting ||
+    timetableLoading ||
+    timetableDraft === null ||
+    thresholdsLoading ||
+    thresholdDraft === null ||
+    testMastersLoading ||
+    testMasterDraft === null
+  ) {
     return (
       <div>
         <PageHeader title="設定" />
@@ -97,8 +179,11 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!draft) return;
-    const validation = validate(draft);
+    if (!draft || thresholdDraft === null || testMasterDraft === null) return;
+    const validation =
+      validate(draft) ??
+      validateThresholds(thresholdDraft) ??
+      validateTestMasters(testMasterDraft);
     if (validation) {
       setToastKind("error");
       setToast(validation);
@@ -131,6 +216,11 @@ export default function SettingsPage() {
       await saveTimetable(cleanedTimetable);
       setTimetableDraft(cleanedTimetable);
 
+      // 成績設定。テストマスタは学年構成から外れても削除しない
+      // （test_id で紐づく得点データが集計不能になるため）
+      await saveThresholds(thresholdDraft);
+      await saveTestMasters(testMasterDraft);
+
       setToastKind("success");
       setToast("設定を保存しました");
     } catch (err) {
@@ -144,6 +234,8 @@ export default function SettingsPage() {
   const handleReset = () => {
     setDraft(structuredClone(setting));
     setTimetableDraft(structuredClone(timetable));
+    setThresholdDraft(structuredClone(thresholds));
+    setTestMasterDraft(structuredClone(testMasters));
   };
 
   return (
@@ -331,6 +423,40 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* 評定の閾値 */}
+      <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">評定の閾値</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            テストの通算得点率から A / B / C を判定する基準です。初期値は 90% / 60%
+            ですが、固定ではありません。学期評定の分布を見てから調整できます。
+          </p>
+        </div>
+        <div className="mt-4">
+          <GradeThresholdEditor thresholds={thresholdDraft} onChange={setThresholdDraft} />
+        </div>
+      </section>
+
+      {/* テストマスタ */}
+      <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">テストマスタ</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            使用する業者単元テストを登録します。手元のテスト冊子を見ながら、単元と
+            観点別の満点を入れてください。年に1回の作業です。
+          </p>
+        </div>
+        <div className="mt-4">
+          <TestMasterEditor
+            testMasters={testMasterDraft}
+            gradeConfigs={draft.grade_configs}
+            unitsByPack={unitsByPack}
+            packLabels={packLabels}
+            onChange={setTestMasterDraft}
+          />
+        </div>
+      </section>
+
       {/* 保存ボタン */}
       <div className="sticky bottom-4 flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <button
@@ -395,6 +521,36 @@ function validate(setting: TeacherSetting): string | null {
   for (const g of setting.grade_configs) {
     if (g.pack_id === "") return `${g.grade}年の使用パックを選択してください`;
     if (g.class_count < 1) return `${g.grade}年のクラス数は1以上にしてください`;
+  }
+  return null;
+}
+
+function validateThresholds(thresholds: GradeThreshold[]): string | null {
+  for (const t of thresholds) {
+    const label = VIEWPOINT_LABELS[t.viewpoint];
+    if (!Number.isInteger(t.a_min) || t.a_min < 0 || t.a_min > 100)
+      return `${label}の A の下限は 0〜100 の整数で入力してください`;
+    if (!Number.isInteger(t.b_min) || t.b_min < 0 || t.b_min > 100)
+      return `${label}の B の下限は 0〜100 の整数で入力してください`;
+    if (t.b_min > t.a_min)
+      return `${label}の B の下限は A の下限以下にしてください`;
+  }
+  return null;
+}
+
+function validateTestMasters(masters: TestMaster[]): string | null {
+  const seenIds = new Set<string>();
+  for (const m of masters) {
+    const label = m.test_name.trim() === "" ? "(名称未設定)" : m.test_name;
+    if (m.unit_name === "") return `テスト「${label}」の単元を選択してください`;
+    if (m.test_name.trim() === "") return "テスト名を入力してください";
+    if (m.max_knowledge === 0 && m.max_thinking === 0)
+      return `テスト「${label}」はどちらかの観点に満点を入力してください`;
+    if (m.max_knowledge < 0 || m.max_thinking < 0)
+      return `テスト「${label}」の満点は0以上にしてください`;
+    // test_id は得点データの紐づけキー。重複するとデータが混ざる
+    if (seenIds.has(m.test_id)) return `テストIDが重複しています（${m.test_id}）`;
+    seenIds.add(m.test_id);
   }
   return null;
 }

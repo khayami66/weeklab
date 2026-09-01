@@ -6,12 +6,15 @@ import type {
   CurriculumPack,
   FirstLessonConfirm,
   FullSnapshot,
+  GradeThreshold,
   LessonMaster,
   TeacherSetting,
+  TestMaster,
   Timetable,
   TimetableOverride,
 } from "@/types";
 import type { DataSource } from "./index";
+import { defaultThresholds } from "@/lib/grading";
 
 import { curriculumPacks } from "@/data/curriculums/registry";
 import { annualPlan as grade3AnnualPlan } from "@/data/curriculums/keirinkan/science/grade3/annualPlan";
@@ -183,6 +186,31 @@ export const localDataSource: DataSource = {
   },
 
   // ── 実施済み確定週 ─────────────────────────────────
+  // ── 成績層：評定閾値・テストマスタ ─────────────────
+  async getTestMasters(): Promise<TestMaster[]> {
+    const year = readCurrentYear();
+    return getItem<TestMaster[]>(yearKey(year, "test_master"), []);
+  },
+
+  async saveTestMasters(m: TestMaster[]): Promise<void> {
+    const year = readCurrentYear();
+    setItem(yearKey(year, "test_master"), m);
+  },
+
+  async getGradeThresholds(): Promise<GradeThreshold[]> {
+    const year = readCurrentYear();
+    const stored = getItem<GradeThreshold[] | null>(yearKey(year, "grade_thresholds"), null);
+    // 未保存なら既定値を返すだけ（getSetting と違い書き込まない）。
+    // 保存は設定画面で明示的に変更されたときだけ行う。
+    if (stored && stored.length > 0) return stored;
+    return defaultThresholds();
+  },
+
+  async saveGradeThresholds(t: GradeThreshold[]): Promise<void> {
+    const year = readCurrentYear();
+    setItem(yearKey(year, "grade_thresholds"), t);
+  },
+
   async getConfirmedWeeks(): Promise<string[]> {
     const year = readCurrentYear();
     return getItem<string[]>(confirmedWeeksKey(year), []);

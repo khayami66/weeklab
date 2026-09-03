@@ -4,6 +4,7 @@ const items = [
   { href: "/", label: "ホーム" },
   { href: "/weekly", label: "週案" },
   { href: "/progress", label: "進度" },
+  { href: "/grades", label: "成績" },
   { href: "/settings", label: "設定" },
 ];
 

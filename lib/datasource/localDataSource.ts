@@ -10,6 +10,7 @@ import type {
   LessonMaster,
   TeacherSetting,
   TestMaster,
+  TestResult,
   Timetable,
   TimetableOverride,
 } from "@/types";
@@ -37,6 +38,8 @@ import {
   listKeys,
   removeItem,
   setItem,
+  testResultKey,
+  testResultPrefix,
   yearKey,
 } from "@/lib/store/localStore";
 
@@ -209,6 +212,26 @@ export const localDataSource: DataSource = {
   async saveGradeThresholds(t: GradeThreshold[]): Promise<void> {
     const year = readCurrentYear();
     setItem(yearKey(year, "grade_thresholds"), t);
+  },
+
+  async getTestResult(test_id: string, class_code: string): Promise<TestResult | null> {
+    const year = readCurrentYear();
+    return getItem<TestResult | null>(testResultKey(year, test_id, class_code), null);
+  },
+
+  async saveTestResult(result: TestResult): Promise<void> {
+    const year = readCurrentYear();
+    setItem(testResultKey(year, result.test_id, result.class_code), result);
+  },
+
+  async listTestResults(): Promise<TestResult[]> {
+    const year = readCurrentYear();
+    const results: TestResult[] = [];
+    for (const key of listKeys(testResultPrefix(year))) {
+      const r = getItem<TestResult | null>(key, null);
+      if (r) results.push(r);
+    }
+    return results;
   },
 
   async getConfirmedWeeks(): Promise<string[]> {

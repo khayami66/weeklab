@@ -10,6 +10,7 @@ import type {
   LessonMaster,
   TeacherSetting,
   TestMaster,
+  TestResult,
   Timetable,
   TimetableOverride,
 } from "@/types";
@@ -56,6 +57,12 @@ export interface DataSource {
   /** 未保存なら既定値（全観点 90/60）を返す */
   getGradeThresholds(): Promise<GradeThreshold[]>;
   saveGradeThresholds(t: GradeThreshold[]): Promise<void>;
+
+  // ── 成績層：テスト得点 ──
+  getTestResult(test_id: string, class_code: string): Promise<TestResult | null>;
+  saveTestResult(result: TestResult): Promise<void>;
+  /** 現年度の全件（期間集計・学期評定で使う） */
+  listTestResults(): Promise<TestResult[]>;
 
   // ── 実施済み確定週（二重確定防止） ──
   getConfirmedWeeks(): Promise<string[]>; // monday_date の配列

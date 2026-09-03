@@ -78,6 +78,20 @@ export function confirmedWeeksKey(year: number): string {
   return `weeklab.${year}.confirmed_weeks`;
 }
 
+/**
+ * テスト得点：weeklab.{year}.test_result.{test_id}.{class_code}
+ *
+ * test_id にドットが含まれるためキーからの逆パースはできないが、
+ * 保存する TestResult 自体が test_id / class_code を持つので不要。
+ */
+export function testResultKey(year: number, testId: string, classCode: string): string {
+  return `${testResultPrefix(year)}${testId}.${classCode}`;
+}
+
+export function testResultPrefix(year: number): string {
+  return `weeklab.${year}.test_result.`;
+}
+
 /** アーカイブメタ：weeklab.archive.{year}.meta */
 export function archiveMetaKey(year: number): string {
   return `weeklab.archive.${year}.meta`;

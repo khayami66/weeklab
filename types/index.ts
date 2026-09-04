@@ -299,6 +299,11 @@ export interface FullSnapshot {
       class_progress: ClassProgress[];
       memos: Record<string, string>; // key → memo text
       first_lesson_confirms: Record<string, FirstLessonConfirm[]>; // monday_date → confirms[]
+      /**
+       * 実施済みに確定した週（monday_date の配列）。
+       * 既存のエクスポートJSONと後方互換にするため optional。
+       */
+      confirmed_weeks?: string[];
       // ── 成績層（v1.6 追加）──
       // 既存のエクスポートJSONには存在しないため optional。
       // インポート側は欠けていても壊れないこと。

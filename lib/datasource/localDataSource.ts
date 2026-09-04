@@ -333,6 +333,30 @@ export const localDataSource: DataSource = {
         first_lesson_confirms: firstLessonConfirms,
       };
 
+      // ── 実施済み確定週（Phase 12）──
+      const confirmedWeeks = getItem<string[]>(confirmedWeeksKey(year), []);
+      if (confirmedWeeks.length > 0) snapshot.years[year].confirmed_weeks = confirmedWeeks;
+
+      // ── 成績層（G1〜G4）──
+      // 型に足しただけで実装を忘れると、復元時に成績だけ消える。
+      // exportImport.test.ts の往復テストで機械的に検出する。
+      const testMasters = getItem<TestMaster[]>(yearKey(year, "test_master"), []);
+      if (testMasters.length > 0) snapshot.years[year].test_masters = testMasters;
+
+      // 閾値は未保存なら既定値を「返すだけ」なので、生のキーを見て保存済みかを判断する
+      const storedThresholds = getItem<GradeThreshold[] | null>(
+        yearKey(year, "grade_thresholds"),
+        null
+      );
+      if (storedThresholds) snapshot.years[year].grade_thresholds = storedThresholds;
+
+      const testResults: TestResult[] = [];
+      for (const resultKey of listKeys(testResultPrefix(year))) {
+        const r = getItem<TestResult | null>(resultKey, null);
+        if (r) testResults.push(r);
+      }
+      if (testResults.length > 0) snapshot.years[year].test_results = testResults;
+
       const archiveMeta = getItem<ArchiveMetadata | null>(archiveMetaKey(year), null);
       const archivedWeeks = getItem<ArchivedWeek[] | null>(archiveWeeksKey(year), null);
       if (archiveMeta) snapshot.years[year].archive_meta = archiveMeta;
@@ -365,6 +389,14 @@ export const localDataSource: DataSource = {
 
       for (const [mondayDate, confirms] of Object.entries(data.first_lesson_confirms)) {
         setItem(firstLessonKey(year, mondayDate), confirms);
+      }
+
+      if (data.confirmed_weeks) setItem(confirmedWeeksKey(year), data.confirmed_weeks);
+
+      if (data.test_masters) setItem(yearKey(year, "test_master"), data.test_masters);
+      if (data.grade_thresholds) setItem(yearKey(year, "grade_thresholds"), data.grade_thresholds);
+      for (const r of data.test_results ?? []) {
+        setItem(testResultKey(year, r.test_id, r.class_code), r);
       }
 
       if (data.archive_meta) setItem(archiveMetaKey(year), data.archive_meta);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import BackupPanel from "@/components/BackupPanel";
 import GradeThresholdEditor from "@/components/GradeThresholdEditor";
 import PageHeader from "@/components/PageHeader";
 import TestMasterEditor from "@/components/TestMasterEditor";
@@ -457,6 +458,25 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* バックアップ */}
+      <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">バックアップ</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            全年度のデータを1つの JSON ファイルに書き出します。
+            この操作は<strong>下の「保存」とは無関係にその場で実行されます</strong>。
+          </p>
+        </div>
+        <div className="mt-4">
+          <BackupPanel
+            onToast={(message, kind) => {
+              setToastKind(kind);
+              setToast(message);
+            }}
+          />
+        </div>
+      </section>
+
       {/* 保存ボタン */}
       <div className="sticky bottom-4 flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <button
@@ -478,7 +498,7 @@ export default function SettingsPage() {
       </div>
 
       <p className="text-xs text-slate-500">
-        ※ Phase 15 で年度切り替え、Phase 17 で JSON バックアップが追加される予定です。
+        ※ Phase 15 で年度切り替えが追加される予定です。
       </p>
 
       <Toast message={toast} kind={toastKind} onDismiss={() => setToast(null)} />

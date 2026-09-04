@@ -147,13 +147,15 @@
 
 **確認**：過去年度の週案が当時の内容で見られる、編集不可。
 
-## Step 17: JSONエクスポート/インポート
-- `lib/exportImport.ts`
-  - `exportAll()`（全年度を1JSON化してダウンロード）
-  - `importAll(snapshot)`（確認ダイアログ → 上書き）
-- `/settings` にボタン追加
+## Step 17: JSONエクスポート/インポート（2026-09-04 完了）
+- `localDataSource.exportAll()` / `importAll()`（`lib/exportImport.ts` は作らず DataSource に置いた）
+- `components/BackupPanel.tsx` を `/settings` の「バックアップ」セクションに配置
+  - 書き出し：`weeklab-backup-YYYYMMDD-HHmm.json` をダウンロード
+  - 復元：ファイル選択 → 中身の件数を見せて確認 → 全置換 → リロード
+- **成績処理の移行入力（約2,100セル）より前に必要**なため、Step 15/16 より先に実施した
 
-**確認**：エクスポート→ブラウザキャッシュクリア→インポートで完全復元。
+**確認**：エクスポート→localStorage を空にする→インポートで完全復元（値が一致）。
+キャンセル時に現在のデータが温存されることも確認済み。
 
 ## Step G1〜G4: 成績処理層（2026-09-01 追加・成績時期のため優先）
 

@@ -268,12 +268,22 @@ interface FullSnapshot {
       class_progress: ClassProgress[];
       memos: Record<string, string>;                       // key → memo text
       first_lesson_confirms: Record<string, FirstLessonConfirm[]>;  // monday_date → confirms[]
+      confirmed_weeks?: string[];          // 実施済みに確定した週（Phase 12）
+      test_masters?: TestMaster[];         // 成績層（G1〜G4）
+      grade_thresholds?: GradeThreshold[];
+      test_results?: TestResult[];
       archive_meta?: ArchiveMetadata;
       archived_weeks?: ArchivedWeek[];
     };
   };
 }
 ```
+
+> **永続化キーを増やしたら、必ず `exportAll` / `importAll` の両方に足す。**
+> 型に足しただけで実装を忘れると、「保存はできるがバックアップから復元できない」
+> データが静かに生まれる。実際に成績3種と `confirmed_weeks` で起きた。
+> `lib/datasource/exportImport.test.ts` の往復テストが検出器になっている
+> （全キー種別を積んで往復させ、完全一致を要求する）。
 
 ### 2.5 成績層
 

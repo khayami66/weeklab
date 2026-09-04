@@ -1,7 +1,11 @@
-import type { ProgressHealth } from "@/types";
+import type { HealthLevel } from "@/types";
 
 type Props = {
-  health: ProgressHealth;
+  /**
+   * level と message だけを見る。ProgressHealth（進度）と
+   * ViewpointBalance（観点の偏り）の両方をそのまま渡せるようにしている。
+   */
+  health: { level: HealthLevel; message: string };
   /** true だとラベルのみ（アイコン風）、false だと詳細メッセージ付き */
   compact?: boolean;
 };
@@ -19,8 +23,11 @@ const LABELS = {
 } as const;
 
 /**
- * 進度ヘルスチェック結果を表示するバッジ。
- * 壁打ち合意事項：±3h で warn、±5h で alert（`checkProgressHealth` と同じ閾値）。
+ * ok / warn / alert の3段階を表示する共通バッジ。
+ *
+ * 進度ヘルスチェック（±3h で warn、±5h で alert）と
+ * 観点の偏り（±10pt で warn、±20pt で alert）で共用する。
+ * 閾値の意味は呼び出し側が message に載せる。
  */
 export default function HealthBadge({ health, compact = false }: Props) {
   const className = `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${STYLES[health.level]}`;

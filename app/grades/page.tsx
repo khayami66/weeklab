@@ -3,19 +3,48 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import PeriodPicker from "@/components/PeriodPicker";
 import ScoreInputTable, { type InputDirection } from "@/components/ScoreInputTable";
+import TermGradeTable from "@/components/TermGradeTable";
 import Toast from "@/components/Toast";
+import ViewpointBalanceTable from "@/components/ViewpointBalanceTable";
+import { useGradeThresholds } from "@/hooks/useGradeThresholds";
 import { useSetting } from "@/hooks/useSetting";
 import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTestResults } from "@/hooks/useTestResults";
 import { formatDate } from "@/lib/date";
-import { ROSTER_ROWS } from "@/lib/grading";
-import type { TeacherSetting, TestMaster, TestResult, ViewPoint } from "@/types";
+import {
+  ROSTER_ROWS,
+  computeClassGrades,
+  computeViewpointBalance,
+  filterResultsByPeriod,
+} from "@/lib/grading";
+import type {
+  TeacherSetting,
+  TestMaster,
+  TestResult,
+  ViewPoint,
+  ViewpointBalance,
+} from "@/types";
+
+/** 画面のタブ（grading_design.md §5.1） */
+type GradeTab = "input" | "term" | "balance";
+
+const TABS: { key: GradeTab; label: string }[] = [
+  { key: "input", label: "得点入力" },
+  { key: "term", label: "学期評定" },
+  { key: "balance", label: "観点の偏り" },
+];
 
 export default function GradesPage() {
   const { setting, loading: settingLoading } = useSetting();
   const { testMasters, loading: mastersLoading } = useTestMasters();
   const { results, loading: resultsLoading, saveMany } = useTestResults();
+  const { thresholds, loading: thresholdsLoading } = useGradeThresholds();
+
+  const [tab, setTab] = useState<GradeTab>("input");
+  /** 集計期間（タブ2・3で共用）。既定は「始業式から今日まで」 */
+  const [period, setPeriod] = useState<{ from: string; to: string } | null>(null);
 
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [hiddenTestIds, setHiddenTestIds] = useState<Set<string>>(new Set());
@@ -30,7 +59,7 @@ export default function GradesPage() {
   const [toastKind, setToastKind] = useState<"success" | "info" | "error">("success");
   const [saving, setSaving] = useState(false);
 
-  const loading = settingLoading || mastersLoading || resultsLoading;
+  const loading = settingLoading || mastersLoading || resultsLoading || thresholdsLoading;
 
   const classCodes = useMemo(() => (setting ? listClassCodes(setting) : []), [setting]);
 
@@ -49,10 +78,45 @@ export default function GradesPage() {
     [classTests, hiddenTestIds]
   );
 
+  // ── タブ2・3 の集計。実施日が集計期間に入るテストだけを通算する ──
+  const periodResults = useMemo(
+    () => (period ? filterResultsByPeriod(results, period.from, period.to) : []),
+    [results, period]
+  );
+
+  const termGrades = useMemo(
+    () =>
+      selectedClass
+        ? computeClassGrades(selectedClass, periodResults, testMasters, thresholds)
+        : [],
+    [selectedClass, periodResults, testMasters, thresholds]
+  );
+
+  const balanceData = useMemo(() => {
+    const classRows: { classCode: string; balance: ViewpointBalance | null }[] = [];
+    const students: ViewpointBalance[] = [];
+
+    for (const code of classCodes) {
+      const grades = computeClassGrades(code, periodResults, testMasters, thresholds);
+      const balances = computeViewpointBalance(grades);
+      // 先頭がクラス単位、以降が児童単位（computeViewpointBalance の仕様）
+      classRows.push({ classCode: code, balance: balances[0] ?? null });
+      for (const b of balances.slice(1)) {
+        if (b.level === "alert") students.push(b);
+      }
+    }
+    students.sort((a, b) => Math.abs(b.gap ?? 0) - Math.abs(a.gap ?? 0));
+
+    return { classRows, students };
+  }, [classCodes, periodResults, testMasters, thresholds]);
+
   // 初期クラスの決定と draft の組み立ては、レンダー中に1度だけ行う
   // （useEffect 内の setState は余分な再レンダーを生むため）
   if (!loading && selectedClass === null && classCodes.length > 0) {
     setSelectedClass(classCodes[0]);
+  }
+  if (!loading && setting !== null && period === null) {
+    setPeriod({ from: setting.start_date, to: todayString() });
   }
   if (!loading && selectedClass !== null && draftClass !== selectedClass) {
     const built = buildDraft(selectedClass, classTests, results);
@@ -174,6 +238,10 @@ export default function GradesPage() {
     setBaseline(serialize(rebuilt));
   };
 
+  // タブを移っても draft は保持される（state はこのページが持っているため）。
+  // ただし未保存分は集計に入らないので、タブ2・3 側で注意を出す。
+  const changeTab = (next: GradeTab) => setTab(next);
+
   const toggleTest = (test_id: string) => {
     setHiddenTestIds((prev) => {
       const next = new Set(prev);
@@ -190,7 +258,27 @@ export default function GradesPage() {
         subtitle="単元テストの得点を入力します（児童の氏名は扱いません）"
       />
 
-      {/* クラス選択 */}
+      {/* タブ */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => changeTab(t.key)}
+            aria-current={t.key === tab ? "page" : undefined}
+            className={`-mb-px min-h-11 rounded-t border-b-2 px-4 py-2 text-sm font-medium ${
+              t.key === tab
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* クラス選択（観点の偏りは全クラスを並べるので出さない） */}
+      {tab !== "balance" && (
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-slate-600">クラス</span>
@@ -210,8 +298,44 @@ export default function GradesPage() {
           ))}
         </div>
       </section>
+      )}
 
-      {classTests.length === 0 ? (
+      {tab !== "input" && period !== null && setting !== null && (
+        <>
+          <PeriodPicker
+            from={period.from}
+            to={period.to}
+            startDate={setting.start_date}
+            onChange={setPeriod}
+          />
+          {isDirty && (
+            <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              「得点入力」タブに未保存の入力があります。
+              <strong>下の集計には反映されていません。</strong>
+              保存してから確認してください。
+            </p>
+          )}
+        </>
+      )}
+
+      {tab === "term" &&
+        (selectedClass === null ? null : (
+          <TermGradeTable
+            classCode={selectedClass}
+            grades={termGrades}
+            thresholds={thresholds}
+          />
+        ))}
+
+      {tab === "balance" && (
+        <ViewpointBalanceTable
+          classRows={balanceData.classRows}
+          students={balanceData.students}
+        />
+      )}
+
+      {tab === "input" &&
+        (classTests.length === 0 ? (
         <Notice>
           {selectedClass} の学年に対応するテストが登録されていません。
           <SettingsLink /> の「テストマスタ」で登録してください。
@@ -299,11 +423,8 @@ export default function GradesPage() {
             </div>
           </div>
 
-          <p className="text-xs text-slate-500">
-            ※ 学期評定（A/B/C）と観点の偏り分析は G4 で追加されます。
-          </p>
         </>
-      )}
+        ))}
 
       <Toast message={toast} kind={toastKind} onDismiss={() => setToast(null)} />
     </div>

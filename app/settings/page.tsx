@@ -562,7 +562,8 @@ function validateTestMasters(masters: TestMaster[]): string | null {
   const seenIds = new Set<string>();
   for (const m of masters) {
     const label = m.test_name.trim() === "" ? "(名称未設定)" : m.test_name;
-    if (m.unit_name === "") return `テスト「${label}」の単元を選択してください`;
+    // 単元は任意。「1学期のまとめ」のように複数単元にまたがるテストがあるため、
+    // 単元に紐づかない登録を許す。必須なのはテスト名と満点だけ。
     if (m.test_name.trim() === "") return "テスト名を入力してください";
     if (m.max_knowledge === 0 && m.max_thinking === 0)
       return `テスト「${label}」はどちらかの観点に満点を入力してください`;

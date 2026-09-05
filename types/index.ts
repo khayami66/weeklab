@@ -201,7 +201,13 @@ export type GradeLevel = "A" | "B" | "C";
 export interface TestMaster {
   test_id: string; // "keirinkan.science.grade3.kaze-gomu"
   pack_id: string; // "keirinkan.science.grade3"
-  unit_name: string; // AnnualPlan.unit_name と一致させる
+  /**
+   * 紐づく単元名（`AnnualPlan.unit_name` と一致させる）。
+   * **空文字を許す。**「1学期のまとめ」のように複数単元にまたがるテストは
+   * 単元に紐づけない。空のテストは、将来の
+   * 「配当時数 × 単元ごとの結果」の突合分析の対象外になる。
+   */
+  unit_name: string;
   test_name: string;
   max_knowledge: number; // 知識・技能の満点（0 = 出題なし）
   max_thinking: number; // 思考・判断・表現の満点（0 = 出題なし）

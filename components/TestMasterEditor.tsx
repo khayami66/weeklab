@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { GradeConfig, TestMaster } from "@/types";
 
 type Props = {
@@ -23,6 +23,10 @@ type Props = {
  * 単元に紐づけずに登録できる。無理に近い単元を選ばせると、
  * 将来の「配当時数 × 単元ごとの結果」の突合で誤った対応づけが生まれる。
  *
+ * **学年ごとに畳む**。全学年ぶんを平らに並べると、学年が増えるほど下に伸びて
+ * 目的のテストに辿り着くまでのスクロールが増えるため（3年6件＋4年6件で既に長い）。
+ * 既定は閉じた状態で、見出しに件数を出して開かずに把握できるようにする。
+ *
  * 学年構成から消えたパックのテストも**削除しない**。
  * 得点データ（TestResult）が test_id で紐づいており、
  * マスタを消すと過去の得点が集計不能になるため、警告の表示にとどめる。
@@ -39,15 +43,51 @@ export default function TestMasterEditor({
     [gradeConfigs]
   );
 
-  const stale = testMasters.filter((m) => !activePackIds.includes(m.pack_id));
+  /** 担当学年 → 担当外（テストだけ残っているパック）の順にグループを作る */
+  const groups = useMemo(() => {
+    const stalePackIds = [...new Set(testMasters.map((m) => m.pack_id))].filter(
+      (id) => !activePackIds.includes(id)
+    );
+    return [...activePackIds, ...stalePackIds].map((packId) => ({
+      packId,
+      isStale: !activePackIds.includes(packId),
+      // update() が testMasters の添字を必要とするため、添字を持ち回る
+      indices: testMasters.reduce<number[]>((acc, m, i) => {
+        if (m.pack_id === packId) acc.push(i);
+        return acc;
+      }, []),
+    }));
+  }, [activePackIds, testMasters]);
+
+  /**
+   * 開いている学年。
+   * 初期値は「未入力のあるパックだけ開く」。保存時に弾かれる項目が
+   * 畳まれて見つけられない状態を作らないため。すべて揃っていれば全部閉じる。
+   */
+  const [openPacks, setOpenPacks] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    for (const m of testMasters) {
+      if (isIncomplete(m)) initial.add(m.pack_id);
+    }
+    return initial;
+  });
+
+  const toggle = (packId: string) =>
+    setOpenPacks((prev) => {
+      const next = new Set(prev);
+      if (next.has(packId)) next.delete(packId);
+      else next.add(packId);
+      return next;
+    });
+
+  const openPack = (packId: string) =>
+    setOpenPacks((prev) => (prev.has(packId) ? prev : new Set(prev).add(packId)));
 
   const update = (index: number, patch: Partial<TestMaster>) => {
-    const next = testMasters.map((m, i) => (i === index ? { ...m, ...patch } : m));
-    onChange(next);
+    onChange(testMasters.map((m, i) => (i === index ? { ...m, ...patch } : m)));
   };
 
-  const add = () => {
-    const packId = activePackIds[0] ?? "";
+  const add = (packId: string) => {
     onChange([
       ...testMasters,
       {
@@ -60,6 +100,7 @@ export default function TestMasterEditor({
         note: "",
       },
     ]);
+    openPack(packId); // 追加した行が畳まれた中に消えないように
   };
 
   const remove = (index: number) => {
@@ -82,137 +123,198 @@ export default function TestMasterEditor({
 
   return (
     <div className="space-y-3">
-      {stale.length > 0 && (
-        <p className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
-          担当から外れた学年のテストが {stale.length} 件あります。入力済みの得点を
-          守るため自動削除はしていません。不要であれば個別に削除してください。
-        </p>
-      )}
-
       {testMasters.length === 0 && (
         <p className="rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          テストが登録されていません。「テストを追加」から、手元のテスト冊子の
-          単元名と観点別の満点を登録してください。
+          テストが登録されていません。下の学年を開き、「テストを追加」から
+          手元のテスト冊子のテスト名と観点別の満点を登録してください。
         </p>
       )}
 
-      {testMasters.map((m, index) => {
-        const units = unitsByPack[m.pack_id] ?? [];
-        const unitMissing = m.unit_name !== "" && !units.includes(m.unit_name);
-        const noMax = m.max_knowledge === 0 && m.max_thinking === 0;
+      {groups.map(({ packId, isStale, indices }) => {
+        const isOpen = openPacks.has(packId);
+        const incomplete = indices.filter((i) => isIncomplete(testMasters[i])).length;
+
         return (
-          <div
-            key={m.test_id}
-            className="grid gap-3 rounded border border-slate-200 p-4 md:grid-cols-[150px_1fr_1fr_110px_110px_auto]"
-          >
-            <Field label="学年・パック">
-              <select
-                value={m.pack_id}
-                onChange={(e) =>
-                  update(index, { pack_id: e.target.value, unit_name: "" })
-                }
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-              >
-                {activePackIds.map((id) => (
-                  <option key={id} value={id}>
-                    {packLabels[id] ?? id}
-                  </option>
-                ))}
-                {!activePackIds.includes(m.pack_id) && (
-                  <option value={m.pack_id}>{packLabels[m.pack_id] ?? m.pack_id}（担当外）</option>
-                )}
-              </select>
-            </Field>
-
-            <Field label="単元">
-              <select
-                value={m.unit_name}
-                onChange={(e) => {
-                  const unit_name = e.target.value;
-                  // テスト名が未入力なら単元名を初期値に入れる
-                  const test_name = m.test_name === "" ? unit_name : m.test_name;
-                  update(index, { unit_name, test_name });
-                }}
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-              >
-                <option value="">（単元に紐づけない）</option>
-                {units.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-                {unitMissing && <option value={m.unit_name}>{m.unit_name}（現行計画になし）</option>}
-              </select>
-              {unitMissing && (
-                <p className="mt-1 text-xs text-amber-600">年間指導計画に無い単元名です</p>
-              )}
-            </Field>
-
-            <Field label="テスト名">
-              <input
-                type="text"
-                value={m.test_name}
-                onChange={(e) => update(index, { test_name: e.target.value })}
-                placeholder="例：風とゴムの力のはたらき"
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-              />
-            </Field>
-
-            <Field label="知識・技能">
-              <MaxInput
-                value={m.max_knowledge}
-                invalid={noMax}
-                ariaLabel={`${m.test_name || "テスト"} の知識・技能の満点`}
-                onChange={(max_knowledge) => update(index, { max_knowledge })}
-              />
-            </Field>
-
-            <Field label="思考・判断・表現">
-              <MaxInput
-                value={m.max_thinking}
-                invalid={noMax}
-                ariaLabel={`${m.test_name || "テスト"} の思考・判断・表現の満点`}
-                onChange={(max_thinking) => update(index, { max_thinking })}
-              />
-            </Field>
-
-            <div className="flex items-end">
+          <div key={packId} className="overflow-hidden rounded border border-slate-200">
+            <h3>
               <button
                 type="button"
-                onClick={() => remove(index)}
-                className="rounded border border-rose-300 bg-white px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50"
-                aria-label={`${m.test_name || "テスト"}を削除`}
+                onClick={() => toggle(packId)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center gap-3 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100"
               >
-                削除
-              </button>
-            </div>
-
-            <p className="col-span-full text-xs text-slate-500">
-              {noMax ? (
-                <span className="text-rose-600">
-                  どちらかの観点に満点を入力してください（0 は「出題なし」の意味です）
+                <span aria-hidden="true" className="text-xs text-slate-400">
+                  {isOpen ? "▼" : "▶"}
                 </span>
-              ) : (
-                <>
-                  満点 0 の観点は「そのテストでは出題なし」として集計から外れます。
-                  {m.unit_name === "" &&
-                    "／単元なしで登録されています（1学期のまとめなど、複数単元にまたがるテスト向け）"}
-                </>
-              )}
-            </p>
+                <span className="text-sm font-medium text-slate-800">
+                  {packLabels[packId] ?? packId}
+                </span>
+                <span className="text-xs tabular-nums text-slate-500">{indices.length}件</span>
+                {incomplete > 0 && (
+                  <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                    未入力 {incomplete}件
+                  </span>
+                )}
+                {isStale && (
+                  <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                    担当外の学年
+                  </span>
+                )}
+              </button>
+            </h3>
+
+            {isOpen && (
+              <div className="space-y-3 border-t border-slate-200 p-4">
+                {isStale && (
+                  <p className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                    担当から外れた学年のテストです。入力済みの得点を守るため自動削除は
+                    していません。不要であれば個別に削除してください。
+                  </p>
+                )}
+
+                {indices.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    この学年のテストはまだ登録されていません。
+                  </p>
+                ) : (
+                  // 全行に共通する説明は、行ごとに繰り返さずグループに1回だけ出す
+                  // （1行ぶんの高さ × 件数がそのままスクロール量になるため）
+                  <p className="text-xs text-slate-500">
+                    満点 0 の観点は「そのテストでは出題なし」として集計から外れます。
+                    「1学期のまとめ」のように複数単元にまたがるテストは、単元を
+                    「（単元に紐づけない）」にしてください。
+                  </p>
+                )}
+
+                {indices.map((index) => {
+                  const m = testMasters[index];
+                  const units = unitsByPack[m.pack_id] ?? [];
+                  const unitMissing = m.unit_name !== "" && !units.includes(m.unit_name);
+                  const noMax = m.max_knowledge === 0 && m.max_thinking === 0;
+                  return (
+                    <div
+                      key={m.test_id}
+                      className="grid gap-3 rounded border border-slate-200 p-4 md:grid-cols-[150px_1fr_1fr_110px_110px_auto]"
+                    >
+                      <Field label="学年・パック">
+                        <select
+                          value={m.pack_id}
+                          onChange={(e) => {
+                            const nextPack = e.target.value;
+                            update(index, { pack_id: nextPack, unit_name: "" });
+                            openPack(nextPack); // 移動先が畳まれていると行が消えたように見える
+                          }}
+                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        >
+                          {activePackIds.map((id) => (
+                            <option key={id} value={id}>
+                              {packLabels[id] ?? id}
+                            </option>
+                          ))}
+                          {!activePackIds.includes(m.pack_id) && (
+                            <option value={m.pack_id}>
+                              {packLabels[m.pack_id] ?? m.pack_id}（担当外）
+                            </option>
+                          )}
+                        </select>
+                      </Field>
+
+                      <Field label="単元">
+                        <select
+                          value={m.unit_name}
+                          onChange={(e) => {
+                            const unit_name = e.target.value;
+                            // テスト名が未入力なら単元名を初期値に入れる
+                            const test_name = m.test_name === "" ? unit_name : m.test_name;
+                            update(index, { unit_name, test_name });
+                          }}
+                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        >
+                          <option value="">（単元に紐づけない）</option>
+                          {units.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                          {unitMissing && (
+                            <option value={m.unit_name}>{m.unit_name}（現行計画になし）</option>
+                          )}
+                        </select>
+                        {unitMissing && (
+                          <p className="mt-1 text-xs text-amber-600">
+                            年間指導計画に無い単元名です
+                          </p>
+                        )}
+                      </Field>
+
+                      <Field label="テスト名">
+                        <input
+                          type="text"
+                          value={m.test_name}
+                          onChange={(e) => update(index, { test_name: e.target.value })}
+                          placeholder="例：風とゴムの力のはたらき"
+                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        />
+                      </Field>
+
+                      <Field label="知識・技能">
+                        <MaxInput
+                          value={m.max_knowledge}
+                          invalid={noMax}
+                          ariaLabel={`${m.test_name || "テスト"} の知識・技能の満点`}
+                          onChange={(max_knowledge) => update(index, { max_knowledge })}
+                        />
+                      </Field>
+
+                      <Field label="思考・判断・表現">
+                        <MaxInput
+                          value={m.max_thinking}
+                          invalid={noMax}
+                          ariaLabel={`${m.test_name || "テスト"} の思考・判断・表現の満点`}
+                          onChange={(max_thinking) => update(index, { max_thinking })}
+                        />
+                      </Field>
+
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => remove(index)}
+                          className="rounded border border-rose-300 bg-white px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50"
+                          aria-label={`${m.test_name || "テスト"}を削除`}
+                        >
+                          削除
+                        </button>
+                      </div>
+
+                      {/* 行ごとに出すのは、その行だけの問題だけ。共通の説明はグループ先頭に1回 */}
+                      {noMax && (
+                        <p className="col-span-full text-xs text-rose-600">
+                          どちらかの観点に満点を入力してください（0 は「出題なし」の意味です）
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => add(packId)}
+                  className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  ＋ {packLabels[packId] ?? packId} にテストを追加
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
-
-      <button
-        type="button"
-        onClick={add}
-        className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-      >
-        ＋ テストを追加
-      </button>
     </div>
   );
+}
+
+/** 保存時に弾かれる状態か。見出しの「未入力n件」と初期展開の判定に使う */
+function isIncomplete(m: TestMaster): boolean {
+  return m.test_name.trim() === "" || (m.max_knowledge === 0 && m.max_thinking === 0);
 }
 
 type MaxInputProps = {

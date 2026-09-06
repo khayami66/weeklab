@@ -362,9 +362,9 @@ function WeeklyPageContent() {
         </section>
       )}
 
-      {/* 今週を実施済みに確定 */}
+      {/* 今週を実施済みに確定（週の授業グリッドの下に置く。貼り付けると最後の曜日に重なる） */}
       {hasTimetable && plan.length > 0 && !isConfirmedWeek && (
-        <section className="sticky bottom-4 rounded-lg border border-blue-300 bg-blue-50 p-4">
+        <section className="rounded-lg border border-blue-300 bg-blue-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-slate-700">
               <span className="font-semibold">{plan.length}コマ</span> 実施で進度が自動前進します

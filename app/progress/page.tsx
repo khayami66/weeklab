@@ -183,9 +183,9 @@ export default function ProgressPage() {
         </section>
       )}
 
-      {/* 保存ボタン（sticky footer） */}
+      {/* 保存ボタン（一覧の下に置く。画面下に貼り付けると最後の行に重なる） */}
       {draft.length > 0 && (
-        <div className="sticky bottom-4 flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <button
             type="button"
             onClick={handleReset}

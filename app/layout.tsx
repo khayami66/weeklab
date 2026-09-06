@@ -28,7 +28,12 @@ export default function RootLayout({
         <Header />
         <div className="flex flex-1">
           <SideNav />
-          <main className="flex-1 p-6">{children}</main>
+          {/*
+            min-w-0 が要る：flex の子は既定で中身より小さくならないため、
+            成績入力のような横に広い表があるとページ全体が横に伸び、
+            表の中の overflow-x-auto が効かなくなる（サイドナビも押し出される）。
+          */}
+          <main className="min-w-0 flex-1 p-6">{children}</main>
         </div>
         <MobileNav />
       </body>

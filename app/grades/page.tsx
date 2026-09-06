@@ -216,13 +216,10 @@ export default function GradesPage() {
       setDraft(rebuilt);
       setBaseline(serialize(rebuilt));
 
-      const cells = targets.reduce(
-        (sum, r) =>
-          sum + r.scores.filter((s) => s.knowledge !== null || s.thinking !== null).length,
-        0
-      );
+      // 件数は出さない。入力件数・平均は表の下に常時出ているので重複するうえ、
+      // 「のべ何名分」は打ち漏らしの検算には使えず（在籍数と一致しない）読み手を迷わせる。
       setToastKind("success");
-      setToast(`${selectedClass} を保存しました（${targets.length}テスト・のべ${cells}名分）`);
+      setToast("保存完了");
     } catch (err) {
       setToastKind("error");
       setToast(`保存に失敗しました: ${String(err)}`);
@@ -399,7 +396,12 @@ export default function GradesPage() {
             onDateChange={setDate}
           />
 
-          <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          {/*
+            画面下に貼り付けない（sticky にしない）。
+            35行の名簿の上に常時かぶさり、下のほうの出席番号の入力欄が
+            隠れて打てなくなるため。名簿を打ち切った先に置く。
+          */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <span className="text-xs text-slate-500">
               {isDirty ? "未保存の入力があります" : "保存済み"}
             </span>

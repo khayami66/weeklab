@@ -92,6 +92,9 @@ export function testResultPrefix(year: number): string {
   return `weeklab.${year}.test_result.`;
 }
 
+/** 授業案（ユーザーが編集した本時内容）：weeklab.{year}.lesson_plan_v1 */
+// ※ 既存の yearKey() で足りるため専用関数は作らない。呼び出しは yearKey(year, "lesson_plan")
+
 /** アーカイブメタ：weeklab.archive.{year}.meta */
 export function archiveMetaKey(year: number): string {
   return `weeklab.archive.${year}.meta`;

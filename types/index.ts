@@ -114,6 +114,28 @@ export interface ClassProgress {
   memo: string;
 }
 
+/**
+ * ユーザーが編集する「実際にやる授業案」（1時間分）。
+ *
+ * パック層の `LessonMaster`（教科書ベースの標準案・全国共有）を**上書きする**。
+ * 基本時間割に対する `TimetableOverride`、教科書に対する `TestMaster` と同じ考え方で、
+ * **共有できる標準はパック層に、その学校・その教員の実際はユーザー層に**置く。
+ *
+ * これがないと、地域性・手元の教材・「教科書通りだとつまらない」への対応が
+ * パック層（他校と共有する資産）を汚すことになる。
+ *
+ * `total_hours` は持たない。単元の時数は `AnnualPlan.allocated_hours` が正本であり、
+ * ここに重複して持つと食い違いが起きるため。
+ */
+export interface LessonPlan {
+  pack_id: string;
+  unit_name: string;
+  lesson_no: number; // 単元内の何時間目か（1始まり）
+  lesson_title: string;
+  content: string; // 週案の1セルに収まる1〜2行
+  note: string;
+}
+
 export interface FirstLessonConfirm {
   class_code: string;
   unit_name: string;
@@ -310,6 +332,8 @@ export interface FullSnapshot {
        * 既存のエクスポートJSONと後方互換にするため optional。
        */
       confirmed_weeks?: string[];
+      /** ユーザーが編集した授業案。パック層の LessonMaster を上書きする */
+      lesson_plans?: LessonPlan[];
       // ── 成績層（v1.6 追加）──
       // 既存のエクスポートJSONには存在しないため optional。
       // インポート側は欠けていても壊れないこと。

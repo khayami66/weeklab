@@ -8,6 +8,7 @@ import type {
   FullSnapshot,
   GradeThreshold,
   LessonMaster,
+  LessonPlan,
   TeacherSetting,
   TestMaster,
   TestResult,
@@ -16,6 +17,7 @@ import type {
 } from "@/types";
 import type { DataSource } from "./index";
 import { defaultThresholds } from "@/lib/grading";
+import { mergeLessonPlans } from "@/lib/lessonPlan";
 
 import { curriculumPacks } from "@/data/curriculums/registry";
 import { annualPlan as grade3AnnualPlan } from "@/data/curriculums/keirinkan/science/grade3/annualPlan";
@@ -159,6 +161,22 @@ export const localDataSource: DataSource = {
   async saveClassProgress(p: ClassProgress[]): Promise<void> {
     const year = readCurrentYear();
     setItem(yearKey(year, "class_progress"), p);
+  },
+
+  async getLessonPlans(): Promise<LessonPlan[]> {
+    const year = readCurrentYear();
+    return getItem<LessonPlan[]>(yearKey(year, "lesson_plan"), []);
+  },
+
+  async saveLessonPlans(plans: LessonPlan[]): Promise<void> {
+    const year = readCurrentYear();
+    setItem(yearKey(year, "lesson_plan"), plans);
+  },
+
+  async getEffectiveLessonMaster(pack_id: string): Promise<LessonMaster[]> {
+    const packMaster = await this.getLessonMaster(pack_id);
+    const userPlans = await this.getLessonPlans();
+    return mergeLessonPlans(packMaster, userPlans, pack_id);
   },
 
   async getMemo(key: string): Promise<string | null> {
@@ -337,6 +355,10 @@ export const localDataSource: DataSource = {
       const confirmedWeeks = getItem<string[]>(confirmedWeeksKey(year), []);
       if (confirmedWeeks.length > 0) snapshot.years[year].confirmed_weeks = confirmedWeeks;
 
+      // ── 授業案（ユーザー層）──
+      const lessonPlans = getItem<LessonPlan[]>(yearKey(year, "lesson_plan"), []);
+      if (lessonPlans.length > 0) snapshot.years[year].lesson_plans = lessonPlans;
+
       // ── 成績層（G1〜G4）──
       // 型に足しただけで実装を忘れると、復元時に成績だけ消える。
       // exportImport.test.ts の往復テストで機械的に検出する。
@@ -392,6 +414,8 @@ export const localDataSource: DataSource = {
       }
 
       if (data.confirmed_weeks) setItem(confirmedWeeksKey(year), data.confirmed_weeks);
+
+      if (data.lesson_plans) setItem(yearKey(year, "lesson_plan"), data.lesson_plans);
 
       if (data.test_masters) setItem(yearKey(year, "test_master"), data.test_masters);
       if (data.grade_thresholds) setItem(yearKey(year, "grade_thresholds"), data.grade_thresholds);

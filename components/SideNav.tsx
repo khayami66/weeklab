@@ -6,7 +6,7 @@ const items = [
   { href: "/progress", label: "進度管理" },
   { href: "/grades", label: "成績処理" },
   { href: "/monthly", label: "月次集計" },
-  { href: "/master", label: "マスタ" },
+  { href: "/master", label: "授業案・マスタ" },
   { href: "/archive", label: "アーカイブ" },
   { href: "/settings", label: "設定" },
 ];

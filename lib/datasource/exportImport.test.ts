@@ -136,6 +136,18 @@ function seedEverything(): void {
   // Phase 12
   put(confirmedWeeksKey(YEAR), ["2026-05-11", "2026-05-18"]);
 
+  // 授業案（ユーザー層）
+  put(yearKey(YEAR, "lesson_plan"), [
+    {
+      pack_id: "keirinkan.science.grade3",
+      unit_name: "風とゴムの力のはたらき",
+      lesson_no: 3,
+      lesson_title: "ゴムの力で車を走らせる",
+      content: "ゴムの伸ばし方を変えて距離を比べる。班ごとに記録用紙へ。",
+      note: "",
+    },
+  ]);
+
   // 成績層（G1〜G4）
   put(yearKey(YEAR, "test_master"), [
     {
@@ -209,6 +221,9 @@ describe("exportAll / importAll", () => {
     expect(year.test_results?.[0].scores[1].thinking).toBeNull(); // 未受験の null が保たれる
 
     expect(year.confirmed_weeks).toEqual(["2026-05-11", "2026-05-18"]);
+
+    expect(year.lesson_plans).toHaveLength(1);
+    expect(year.lesson_plans?.[0].lesson_title).toBe("ゴムの力で車を走らせる");
   });
 
   it("成績を入力したあとインポートしても、成績が消えない", async () => {
@@ -258,7 +273,8 @@ describe("exportAll / importAll", () => {
 
     const setting = await localDataSource.getSetting();
     expect(setting.school_name).toBe("旧形式");
-    // 旧形式には無いので、成績は空になる（消えるのではなく元から入っていない）
+    // 旧形式には無いので、成績・授業案は空になる（消えるのではなく元から入っていない）
     expect(await localDataSource.getTestMasters()).toEqual([]);
+    expect(await localDataSource.getLessonPlans()).toEqual([]);
   });
 });

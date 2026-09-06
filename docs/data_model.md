@@ -269,6 +269,7 @@ interface FullSnapshot {
       memos: Record<string, string>;                       // key → memo text
       first_lesson_confirms: Record<string, FirstLessonConfirm[]>;  // monday_date → confirms[]
       confirmed_weeks?: string[];          // 実施済みに確定した週（Phase 12）
+      lesson_plans?: LessonPlan[];         // 授業案（ユーザー層。パック層の LessonMaster を上書き）
       test_masters?: TestMaster[];         // 成績層（G1〜G4）
       grade_thresholds?: GradeThreshold[];
       test_results?: TestResult[];

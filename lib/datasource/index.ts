@@ -8,6 +8,7 @@ import type {
   FullSnapshot,
   GradeThreshold,
   LessonMaster,
+  LessonPlan,
   TeacherSetting,
   TestMaster,
   TestResult,
@@ -42,6 +43,16 @@ export interface DataSource {
 
   getClassProgress(): Promise<ClassProgress[]>;
   saveClassProgress(p: ClassProgress[]): Promise<void>;
+
+  /**
+   * 授業案（ユーザー層）。パック層の `getLessonMaster` を上書きする。
+   * 合成済みのものが欲しいときは `getEffectiveLessonMaster` を使う。
+   */
+  getLessonPlans(): Promise<LessonPlan[]>;
+  saveLessonPlans(plans: LessonPlan[]): Promise<void>;
+
+  /** パック層の本時マスタにユーザーの授業案を重ねたもの。画面はこちらを使う */
+  getEffectiveLessonMaster(pack_id: string): Promise<LessonMaster[]>;
 
   getMemo(key: string): Promise<string | null>;
   saveMemo(key: string, memo: string): Promise<void>;

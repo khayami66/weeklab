@@ -47,7 +47,7 @@ export default function HomePage() {
       for (const id of ids) {
         const [ap, lm] = await Promise.all([
           localDataSource.getAnnualPlan(id),
-          localDataSource.getLessonMaster(id),
+          localDataSource.getEffectiveLessonMaster(id),
         ]);
         result[id] = { annualPlan: ap, lessonMaster: lm };
       }

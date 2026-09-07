@@ -110,7 +110,11 @@ export default function PrintWeeklySheet({
       </div>
 
       {/* 週案グリッド：日（行）× 時限（列）。A4縦は横が狭いので日を行にする */}
-      <div className="min-h-0 flex-1">
+      {/*
+        全36枠が埋まった週（担任利用）では中身が枠を超えることがある。
+        超えたぶんは下の時数表に食い込ませず、ここで止める。
+      */}
+      <div className="min-h-0 flex-1 overflow-hidden">
         <table className="h-full w-full table-fixed border-collapse text-[9px] leading-tight">
         <colgroup>
           <col style={{ width: "38px" }} />
@@ -148,24 +152,40 @@ export default function PrintWeeklySheet({
                       key={period}
                       className="border border-emerald-700 px-1 py-0.5 align-top"
                     >
-                      {lessons.map((l) => (
-                        <div key={l.class_code} className="mb-0.5">
-                          <div className="flex items-baseline justify-between gap-1">
-                            <span className="font-bold">{l.class_code}</span>
-                            {l.lesson_no > 0 && (
-                              <span className="shrink-0 tabular-nums text-slate-600">
-                                {l.lesson_no}/{l.total_hours}
-                              </span>
+                      {lessons.map((l) => {
+                        // 授業案が未記入のコマは「(未作成)」を紙に刷らない。
+                        // 画面は促すために出すが、提出物にその文字は要らない
+                        const title =
+                          l.lesson_title && l.lesson_title !== "(未作成)"
+                            ? l.lesson_title
+                            : "";
+                        return (
+                          <div key={l.class_code} className="mb-1">
+                            <div className="flex items-baseline justify-between gap-1">
+                              <span className="text-[11px] font-bold">{l.class_code}</span>
+                              {l.lesson_no > 0 && (
+                                <span className="shrink-0 text-[9px] tabular-nums text-slate-600">
+                                  {l.lesson_no}/{l.total_hours}
+                                </span>
+                              )}
+                            </div>
+                            {/* 単元名は折り返して2行まで。長い単元名を切り落とさない */}
+                            <div className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-snug">
+                              {l.unit_name}
+                            </div>
+                            {title && (
+                              <div className="mt-0.5 line-clamp-2 text-[9px] leading-snug text-slate-800">
+                                {title}
+                              </div>
+                            )}
+                            {l.content && (
+                              <div className="mt-1 line-clamp-5 text-[9px] leading-relaxed text-slate-600">
+                                {l.content}
+                              </div>
                             )}
                           </div>
-                          <div className="truncate font-medium">{l.unit_name}</div>
-                          {l.content && (
-                            <div className="line-clamp-5 text-[8px] text-slate-700">
-                              {l.content}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                       {cancels.map((c) => (
                         <div key={`x${c.class_code}`} className="text-slate-500">
                           <span className="line-through">{c.class_code}</span> 休講

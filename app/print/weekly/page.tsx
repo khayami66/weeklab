@@ -143,12 +143,17 @@ function PrintWeeklyContent() {
       ) : (
         <div className="overflow-x-auto print:overflow-visible">
           {/*
-            画面でも A4縦（210 × 297mm、余白 8mm）の実寸で見せる。
+            画面でも A4縦（幅 210mm、余白 8mm）の実寸で見せる。
             画面幅いっぱいに広げると紙より横長になり、**印刷結果と字詰まりが変わって
-            プレビューの意味がなくなる**ため、mm 指定で紙と同じ寸法に固定する。
+            プレビューの意味がなくなる**ため、mm 指定で紙と同じ幅に固定する。
+
+            **高さは A4 の 297mm に固定しない**（中身に合わせる）。
+            紙の高さぶん白を出すと下が大きく空いて見えるだけで、
+            確認したい中身から目が離れるため。上下の余白は 8mm でそろう。
+
             印刷時は @page が余白を持つので、幅・余白・影を落とす。
           */}
-          <div className="mx-auto w-[210mm] min-h-[297mm] rounded border border-slate-300 bg-white p-[8mm] shadow-md print:m-0 print:min-h-0 print:w-auto print:rounded-none print:border-0 print:p-0 print:shadow-none">
+          <div className="mx-auto w-[210mm] rounded border border-slate-300 bg-white p-[8mm] shadow-md print:m-0 print:w-auto print:rounded-none print:border-0 print:p-0 print:shadow-none">
             <PrintWeeklySheet
               setting={setting}
               weekNo={weekNo}

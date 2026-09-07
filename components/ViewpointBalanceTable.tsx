@@ -105,27 +105,93 @@ export default function ViewpointBalanceTable({ classRows, students }: Props) {
             差が {BALANCE_ALERT_PT}pt 以上の児童はいません。
           </p>
         ) : (
-          <ul className="space-y-1.5">
-            {students.map((b) => (
-              <li
-                key={`${b.class_code}:${b.student_no}`}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <span className="font-medium text-slate-700">
-                  {b.class_code} {b.student_no}番
-                </span>
-                <span className="text-slate-600 tabular-nums">
-                  {VIEWPOINT_LABELS.knowledge} {formatRate(b.knowledge_rate)}
-                </span>
-                <span className="text-slate-600 tabular-nums">
-                  {VIEWPOINT_LABELS.thinking} {formatRate(b.thinking_rate)}
-                </span>
-                <span className={`font-medium tabular-nums ${gapColor(b)}`}>
-                  {formatGap(b.gap)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <>
+            {/*
+              クラスごとにまとめ、横に並べる。
+              全クラスを1列に混ぜて並べると縦に長くなり、右側が空いたまま
+              「どのクラスに偏りが集中しているか」も読み取れないため。
+              クラス内は差の大きい順（students が既にその順）。
+            */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {classRows.map(({ classCode }) => {
+                const members = students.filter((b) => b.class_code === classCode);
+                if (members.length === 0) return null;
+                return (
+                  <div
+                    key={classCode}
+                    className="overflow-hidden rounded border border-slate-200"
+                  >
+                    <div className="flex items-baseline justify-between bg-slate-50 px-3 py-1.5">
+                      <span className="text-sm font-medium text-slate-800">{classCode}</span>
+                      <span className="text-xs tabular-nums text-slate-500">
+                        {members.length}名
+                      </span>
+                    </div>
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          <th className="border-b border-slate-200 px-2 py-1 text-right text-xs font-medium text-slate-500">
+                            番号
+                          </th>
+                          <th className="border-b border-slate-200 px-2 py-1 text-right text-xs font-medium text-slate-500">
+                            知技
+                          </th>
+                          <th className="border-b border-slate-200 px-2 py-1 text-right text-xs font-medium text-slate-500">
+                            思判表
+                          </th>
+                          <th className="border-b border-slate-200 px-2 py-1 text-right text-xs font-medium text-slate-500">
+                            差
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {members.map((b) => (
+                          <tr key={b.student_no} className="border-b border-slate-100 bg-white">
+                            <td className="px-2 py-1 text-right text-xs tabular-nums text-slate-500">
+                              {b.student_no}
+                            </td>
+                            <td className="px-2 py-1 text-right tabular-nums text-slate-700">
+                              {formatRate(b.knowledge_rate)}
+                            </td>
+                            <td className="px-2 py-1 text-right tabular-nums text-slate-700">
+                              {formatRate(b.thinking_rate)}
+                            </td>
+                            <td
+                              className={`px-2 py-1 text-right font-medium tabular-nums ${gapColor(b)}`}
+                            >
+                              {formatGap(b.gap)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 該当者がいないクラスも「見た」ことが分かるように1行で出す */}
+            {(() => {
+              const clear = classRows
+                .filter(
+                  (r) =>
+                    r.balance !== null &&
+                    !students.some((b) => b.class_code === r.classCode)
+                )
+                .map((r) => r.classCode);
+              if (clear.length === 0) return null;
+              return (
+                <p className="text-xs text-slate-500">
+                  該当なし：{clear.join("、")}
+                </p>
+              );
+            })()}
+
+            <p className="text-xs text-slate-500">
+              知技＝{VIEWPOINT_LABELS.knowledge}／思判表＝{VIEWPOINT_LABELS.thinking}。
+              クラス内は差の大きい順です。
+            </p>
+          </>
         )}
       </section>
     </div>

@@ -296,7 +296,11 @@ export function generateWeeklyPlan(
     class_tallies: progress.map((p) => ({
       class_code: p.class_code,
       weekly_hours: tallyByClass[p.class_code] ?? 0,
-      cumulative_hours: p.total_completed_hours + (tallyByClass[p.class_code] ?? 0),
+      // **この週のコマ数を足さない。**
+      // 足すと「今週を実施済みに確定」した後で二重に数える
+      // （確定で total_completed_hours が +n されるのに、表示でまた +n していた）。
+      // 累計は確定した分だけ増えるのが正しく、/progress での手動補正もそのまま効く。
+      cumulative_hours: p.total_completed_hours,
     })),
   };
 

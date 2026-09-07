@@ -167,11 +167,13 @@ function WeeklyPageContent() {
 
   // 「月実施」：この週の**月曜が属する月**の全週を合計する（月次集計と同じ月基準）
   const summaryMonth = monday.getMonth() + 1;
+  // 「実施」は確定した週だけを数える（本人決定 2026-09-07）
   const monthlyHours = computeMonthlyHoursByClass(
     monday.getFullYear(),
     summaryMonth,
     timetable,
-    overrides
+    overrides,
+    confirmedWeeks
   );
 
   // ── 時間割の変更（週内例外）──
@@ -415,12 +417,28 @@ function WeeklyPageContent() {
       {hasTimetable && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="mb-2 text-sm font-semibold text-slate-700">時数</h2>
-          <WeekSummaryTable summary={summary} monthlyHours={monthlyHours} month={summaryMonth} />
+          <WeekSummaryTable
+            summary={summary}
+            monthlyHours={monthlyHours}
+            month={summaryMonth}
+            weekConfirmed={isConfirmedWeek}
+          />
           <p className="mt-2 text-xs text-slate-500">
-            <strong>週実施</strong>＝この週のコマ数／
-            <strong>月実施</strong>＝この週の月曜が属する月の全週の合計／
-            <strong>累計</strong>＝年度当初からの実施累計（この週を含む）。
+            <strong>いずれも「今週を実施済みに確定」した週だけを数えます。</strong>
+            <br />
+            <strong>週実施</strong>＝この週のコマ数（未確定なら 0）／
+            <strong>月実施</strong>＝この週の月曜が属する月のうち、確定済みの週の合計／
+            <strong>累計</strong>＝進度管理の累計時数（年度当初からの実施分）。
             休講にしたコマは数えていません。
+            {!isConfirmedWeek && (
+              <>
+                <br />
+                <span className="text-amber-700">
+                  この週はまだ確定していないため、週実施は 0 です。
+                  下の「今週を実施済みに確定」を押すと反映されます。
+                </span>
+              </>
+            )}
           </p>
         </section>
       )}

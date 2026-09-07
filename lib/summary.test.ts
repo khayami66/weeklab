@@ -25,7 +25,8 @@ describe("computeWeekSummary", () => {
     expect(summary.week_no).toBe(1);
     const g3 = summary.class_tallies.find((c) => c.class_code === "3-1")!;
     expect(g3.weekly_hours).toBe(5);
-    expect(g3.cumulative_hours).toBe(5);
+    // 累計は確定済みの分だけ（この週のコマ数は足さない）
+    expect(g3.cumulative_hours).toBe(0);
   });
 });
 

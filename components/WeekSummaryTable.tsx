@@ -10,6 +10,14 @@ type Props = {
   monthlyHours?: Record<string, number>;
   /** 「月実施」の見出しに添える月（例：9） */
   month?: number;
+  /**
+   * 表示中の週が「実施済みに確定」されているか。
+   *
+   * **未確定なら週実施は 0。**3項目とも「実施」の名のとおり、
+   * 確定した分だけを数える方針にしている（本人決定 2026-09-07）。
+   * その週に何コマあるかは、確定ボタンの横に「nコマ 実施で…」として出ている。
+   */
+  weekConfirmed?: boolean;
 };
 
 /**
@@ -19,7 +27,12 @@ type Props = {
  * 「今週は全部で何コマか」「今月の総授業時数はいくつか」がその場で分からず、
  * 管理職への提出時に暗算することになるため。
  */
-export default function WeekSummaryTable({ summary, monthlyHours, month }: Props) {
+export default function WeekSummaryTable({
+  summary,
+  monthlyHours,
+  month,
+  weekConfirmed = true,
+}: Props) {
   const tallies = summary.class_tallies;
 
   if (tallies.length === 0) {
@@ -30,7 +43,9 @@ export default function WeekSummaryTable({ summary, monthlyHours, month }: Props
     {
       label: "週実施",
       value: (classCode: string) =>
-        tallies.find((t) => t.class_code === classCode)?.weekly_hours ?? 0,
+        weekConfirmed
+          ? (tallies.find((t) => t.class_code === classCode)?.weekly_hours ?? 0)
+          : 0,
     },
     ...(monthlyHours
       ? [

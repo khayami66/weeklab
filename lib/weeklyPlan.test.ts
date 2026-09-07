@@ -78,9 +78,11 @@ describe("generateWeeklyPlan - 基本動作", () => {
     const g3 = summary.class_tallies.find((c) => c.class_code === "3-1")!;
     const g4 = summary.class_tallies.find((c) => c.class_code === "4-1")!;
     expect(g3.weekly_hours).toBe(5);
-    expect(g3.cumulative_hours).toBe(5); // 期首から5時間消化
+    // 累計は progress.total_completed_hours そのまま（この週のコマ数は足さない）。
+    // 足すと「今週を実施済みに確定」した後に二重計上される
+    expect(g3.cumulative_hours).toBe(0);
     expect(g4.weekly_hours).toBe(5);
-    expect(g4.cumulative_hours).toBe(5);
+    expect(g4.cumulative_hours).toBe(0);
   });
 });
 

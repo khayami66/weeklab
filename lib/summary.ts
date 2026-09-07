@@ -23,7 +23,8 @@ interface PackBundle {
  * 週案と現在の進度から WeekSummary を算出する。
  *
  * - weekly_hours: 週内の実施コマ数（クラスごと）
- * - cumulative_hours: 当該週の実施後の累計（= progress.total_completed_hours + weekly_hours）
+ * - cumulative_hours: **確定済みの累計そのまま**（`progress.total_completed_hours`）。
+ *   この週のコマ数は足さない（確定後に二重計上されるため）
  *
  * 注意：`generateWeeklyPlan` も内部で WeekSummary を返すため、このヘルパーは
  * 「既存の plan/progress から後付けで再集計したい」ケースで使う想定。
@@ -52,7 +53,7 @@ export function computeWeekSummary(
     class_tallies: progress.map((p) => ({
       class_code: p.class_code,
       weekly_hours: tallyByClass[p.class_code] ?? 0,
-      cumulative_hours: p.total_completed_hours + (tallyByClass[p.class_code] ?? 0),
+      cumulative_hours: p.total_completed_hours,
     })),
   };
 }
@@ -127,7 +128,8 @@ export function computeMonthSummary(
  * その月のクラス別コマ数を数える（週案画面の「月実施」用）。
  *
  * **月基準は月曜日が属する月**（月次集計と同じルール）。
- * その月の全週を対象にするので、月の途中の週を見ていても「その月の合計」が出る。
+ * **「今週を実施済みに確定」した週だけを数える**（`confirmedWeeks`）。
+ * 予定を含めると「実施」という名前と食い違い、確定を押す意味も薄れるため。
  *
  * コマ数は**時間割と例外だけで決まる**（どの単元をやるかには依らない）ので、
  * `generateWeeklyPlan` を通さず `buildWeekSlots` で数える。
@@ -139,10 +141,14 @@ export function computeMonthlyHoursByClass(
   year: number,
   month: number,
   timetable: Timetable[],
-  overrides: TimetableOverride[]
+  overrides: TimetableOverride[],
+  confirmedWeeks: string[]
 ): Record<string, number> {
+  const confirmed = new Set(confirmedWeeks);
   const hours: Record<string, number> = {};
   for (const monday of collectMondaysForMonth(year, month)) {
+    // **確定した週だけ数える。**「実施」の名のとおり、やった分だけを積む
+    if (!confirmed.has(formatDate(monday, "YYYY-MM-DD"))) continue;
     const { slots } = buildWeekSlots(monday, timetable, overrides);
     for (const s of slots) {
       hours[s.class_code] = (hours[s.class_code] ?? 0) + 1;

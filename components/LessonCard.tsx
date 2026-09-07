@@ -17,31 +17,75 @@ type Props = {
   onRemove?: () => void;
   /** 「×」の説明（休講にする／追加を取り消す、で意味が変わる） */
   removeLabel?: string;
+  /**
+   * そのクラスの「その週の最初のコマ」であることを示し、押すと単元・本時を選べる。
+   *
+   * バッジやリンクを**カードの外に足さない**。1コマあたり約24px 縦に伸び、
+   * 7クラスぶんで画面の1/6ほどを食っていたため、
+   * **色（＝面）で示し、カード自体を押させる**形にした。
+   */
+  firstLesson?: {
+    /** 自分で指定済みか（false なら進度からの推定値） */
+    confirmed: boolean;
+    onClick: () => void;
+  };
 };
 
 /**
  * 1コマの授業カード（ホーム画面の今日カード、週案画面のコマ表示で使用）。
  * 時刻は扱わない（壁打ち合意事項E）。
  */
-export default function LessonCard({ lesson, compact, onRemove, removeLabel }: Props) {
+export default function LessonCard({
+  lesson,
+  compact,
+  onRemove,
+  removeLabel,
+  firstLesson,
+}: Props) {
   const isCompleted = lesson.lesson_no === 0; // 年間計画完遂
   const isUnmade = lesson.lesson_title === "(未作成)" || lesson.lesson_title === "";
 
+  // 先頭コマは面の色で示す。指定済みは枠を濃くして推定と区別する（高さは増やさない）
+  const firstClass = firstLesson
+    ? `cursor-pointer bg-blue-50 hover:bg-blue-100 ${
+        firstLesson.confirmed ? "border-blue-500" : "border-blue-200"
+      }`
+    : "border-slate-200 bg-white";
+
   return (
     <article
-      className={`rounded-lg border border-slate-200 bg-white shadow-sm ${
+      className={`rounded-lg border shadow-sm ${firstClass} ${
         compact ? "p-2" : "p-4 transition-shadow hover:shadow-md"
       } ${
         // 自分で追加したコマ。左端の細い線だけで示す（高さを増やさずに見分ける）。
         // 「×」の意味がこのコマだけ「追加を取り消す」に変わるため、印が要る。
         lesson.is_override ? "border-l-4 border-l-emerald-400" : ""
       }`}
+      {...(firstLesson
+        ? {
+            role: "button" as const,
+            tabIndex: 0,
+            title: `${lesson.class_code} はこの週ここから始まります。押すと単元・本時を変えられます`,
+            onClick: firstLesson.onClick,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                firstLesson.onClick();
+              }
+            },
+          }
+        : {})}
     >
       <div className="flex items-center justify-between">
         {onRemove ? (
           <button
             type="button"
-            onClick={onRemove}
+            onClick={(e) => {
+              // カード全体がクリック対象（先頭コマ）のとき、
+              // 「×」を押しただけでピッカーが開かないようにする
+              e.stopPropagation();
+              onRemove();
+            }}
             aria-label={removeLabel ?? "この時間をなくす"}
             title={removeLabel ?? "この時間をなくす"}
             className="-ml-1 -mt-1 rounded px-1.5 text-sm leading-none text-slate-300 hover:bg-rose-50 hover:text-rose-600"

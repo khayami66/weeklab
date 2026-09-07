@@ -226,6 +226,8 @@ export default function WeeklyGrid({
                     <div className="space-y-2">
                       {lessons.map((lesson) => {
                         const key = `${lesson.date}:${lesson.period}:${lesson.class_code}`;
+                        const isFirst =
+                          canPickFirst && firstSlotKey.get(lesson.class_code) === key;
                         return (
                           <div key={key}>
                             <LessonCard
@@ -257,15 +259,24 @@ export default function WeeklyGrid({
                                   ? "追加したこのコマを取り消す"
                                   : "この時間を休講にする"
                               }
+                              firstLesson={
+                                isFirst
+                                  ? {
+                                      confirmed: firstLesson!.confirms.some(
+                                        (c) => c.class_code === lesson.class_code
+                                      ),
+                                      onClick: () =>
+                                        setOpenKey(
+                                          openKey === `first:${key}` ? null : `first:${key}`
+                                        ),
+                                    }
+                                  : undefined
+                              }
                             />
-                            {canPickFirst && firstSlotKey.get(lesson.class_code) === key && (
+                            {isFirst && openKey === `first:${key}` && (
                               <FirstLessonBlock
                                 lesson={lesson}
                                 handlers={firstLesson!}
-                                open={openKey === `first:${key}`}
-                                onToggle={() =>
-                                  setOpenKey(openKey === `first:${key}` ? null : `first:${key}`)
-                                }
                                 onClose={() => setOpenKey(null)}
                               />
                             )}
@@ -328,55 +339,25 @@ export default function WeeklyGrid({
 function FirstLessonBlock({
   lesson,
   handlers,
-  open,
-  onToggle,
   onClose,
 }: {
   lesson: WeeklyPlan;
   handlers: FirstLessonHandlers;
-  open: boolean;
-  onToggle: () => void;
   onClose: () => void;
 }) {
   const packId = handlers.packIdByClass[lesson.class_code];
   const annualPlan = handlers.annualPlanByPack[packId] ?? [];
-  const confirm = handlers.confirms.find((c) => c.class_code === lesson.class_code);
-  const isConfirmed = confirm !== undefined;
+  const isConfirmed = handlers.confirms.some((c) => c.class_code === lesson.class_code);
 
   return (
-    <>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded px-1.5 py-0.5 text-xs ${
-            isConfirmed ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
-          }`}
-          title={
-            isConfirmed
-              ? "この週の開始位置を指定済み"
-              : "進度から推定した開始位置。必要なら指定できます"
-          }
-        >
-          {isConfirmed ? "開始 指定済み" : "開始 推定"}
-        </span>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-xs text-blue-600 underline hover:text-blue-800"
-        >
-          単元・本時
-        </button>
-      </div>
-      {open && (
-        <FirstLessonPicker
-          classCode={lesson.class_code}
-          annualPlan={annualPlan}
-          currentUnitName={lesson.unit_name}
-          currentLessonNo={lesson.lesson_no}
-          isConfirmed={isConfirmed}
-          onChange={(next) => handlers.onChange(lesson.class_code, next)}
-          onClose={onClose}
-        />
-      )}
-    </>
+    <FirstLessonPicker
+      classCode={lesson.class_code}
+      annualPlan={annualPlan}
+      currentUnitName={lesson.unit_name}
+      currentLessonNo={lesson.lesson_no}
+      isConfirmed={isConfirmed}
+      onChange={(next) => handlers.onChange(lesson.class_code, next)}
+      onClose={onClose}
+    />
   );
 }

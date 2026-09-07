@@ -115,8 +115,8 @@ function PrintWeeklyContent() {
         <div>
           <h1 className="text-xl font-bold text-slate-800">週案の印刷</h1>
           <p className="mt-1 text-xs text-slate-500">
-            下が実際の紙面（A4横・1枚）です。ブラウザの印刷で
-            <strong>用紙サイズ A4・向き 横・余白は既定</strong>のまま出力してください。
+            下が実際の紙面（A4縦・1枚）です。ブラウザの印刷で
+            <strong>用紙サイズ A4・向き 縦・余白は既定</strong>のまま出力してください。
           </p>
         </div>
         <div className="flex gap-2">

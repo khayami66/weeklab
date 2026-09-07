@@ -24,20 +24,19 @@ type Props = {
 };
 
 /**
- * 週案の印刷面（松戸市様式・Y案）。A4横1枚。
+ * 週案の印刷面（松戸市様式・Y案）。**A4 縦1枚**。
  *
- * 画面の週案グリッドと**同じ構造**（月〜土 × 1〜6限）にしている。
- * 週案画面を枠固定にしたことで、印刷用に別のレイアウトを起こす必要がなくなった。
+ * **日を行・時限を列**に組む。理由は2つ。
+ *   1. A4縦は横幅が狭い（余白を引いて194mm）。曜日を列にすると1列30mmを切り、
+ *      授業内容が読めなくなる。行にすれば縦の余裕を使える
+ *   2. 記録に残る様式が「**月〜金5行**」＝日が行（`reference_source_images.md`）
  *
- * 記録に残る様式の要点（`reference_source_images.md`）：
- *   - 月〜金5行 ＋ 教科別集計欄、緑系罫線
- *   - 集計は「**週予定・週実施・実施累計**」の3行
- *   - Y案では月〜**土**に拡張する（管理職合意済み）
+ * 画面の週案グリッドは「時限を行・曜日を列」なので**転置した形**になるが、
+ * セルの中身（日付 × 時限）は同じなので差し替えるだけで済んでいる。
  *
- * **集計が画面と違う点：紙は「週予定」を先頭に置く。**
- * 週案は実施前に提出するものなので、画面の「週実施」（確定した週だけ数える）は
- * 提出時点では 0 になる。紙には予定を出さないと意味がないため、様式どおり
- * 予定と実施を並べる。
+ * 集計の要点：**紙は「週予定」を先頭に置く。**
+ * 週案は実施前に提出するため、確定した週だけを数える「週実施」は
+ * 提出時点で必ず 0 になる。様式が予定と実施を並べているのはこのため。
  *
  * 週先頭コマが未確定でも警告は出さない（推定値でそのまま刷る）。
  */
@@ -88,99 +87,101 @@ export default function PrintWeeklySheet({
     <div className="print-keep mx-auto w-full bg-white text-slate-900">
       {/* ヘッダー：年度・週・期間・所属・検印 */}
       <div className="mb-1.5 flex items-end justify-between border-b-2 border-emerald-700 pb-1">
-        <div className="flex items-baseline gap-3">
-          <span className="text-base font-bold">週案（理科専科）</span>
-          <span className="text-sm">
+        <div>
+          <div className="text-sm font-bold">週案（理科専科）</div>
+          <div className="mt-0.5 text-[10px]">
             {setting.school_year}年度　第{weekNo}週
-          </span>
-          <span className="text-sm">
             {formatDate(weekDates[0], "M月D日")} 〜{" "}
             {formatDate(weekDates[weekDates.length - 1], "M月D日")}
-          </span>
+          </div>
         </div>
-        <div className="flex items-end gap-3">
-          <span className="text-xs">
+        <div className="flex items-end gap-2">
+          <span className="text-[10px]">
             {setting.school_name}　{setting.teacher_name}
           </span>
           {/* 検印欄は空欄（手書き） */}
-          <span className="flex h-10 w-16 items-start justify-center border border-slate-700 text-[9px] text-slate-500">
+          <span className="flex h-9 w-14 items-start justify-center border border-slate-700 text-[8px] text-slate-500">
             検印
           </span>
         </div>
       </div>
 
-      {/* 週案グリッド：月〜土 × 1〜6限 */}
-      <table className="w-full table-fixed border-collapse text-[9px] leading-tight">
+      {/* 週案グリッド：日（行）× 時限（列）。A4縦は横が狭いので日を行にする */}
+      <table className="w-full table-fixed border-collapse text-[8px] leading-tight">
         <colgroup>
-          <col style={{ width: "22px" }} />
-          {dateKeys.map((k) => (
-            <col key={k} />
+          <col style={{ width: "38px" }} />
+          {PERIODS.map((p) => (
+            <col key={p} />
           ))}
         </colgroup>
         <thead>
           <tr>
             <th className="border border-emerald-700 bg-emerald-50 p-0.5" />
-            {weekDates.map((d, i) => (
+            {PERIODS.map((p) => (
               <th
-                key={dateKeys[i]}
-                className="border border-emerald-700 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold"
+                key={p}
+                className="border border-emerald-700 bg-emerald-50 px-1 py-0.5 text-[9px] font-bold"
               >
-                {WEEKDAYS[i]}　{formatDate(d, "M/D")}
+                {p}限
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {PERIODS.map((period) => (
-            <tr key={period}>
-              <th className="border border-emerald-700 bg-emerald-50 px-0.5 py-0.5 text-center text-[9px] font-normal">
-                {period}
-              </th>
-              {dateKeys.map((dateKey) => {
-                const lessons = byCell.get(`${dateKey}:${period}`) ?? [];
-                const cancels = cancelledByCell.get(`${dateKey}:${period}`) ?? [];
-                return (
-                  <td
-                    key={dateKey}
-                    className="h-[52px] border border-emerald-700 px-1 py-0.5 align-top"
-                  >
-                    {lessons.map((l) => (
-                      <div key={`${l.class_code}`} className="mb-0.5">
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-bold">{l.class_code}</span>
-                          <span className="truncate">{l.unit_name}</span>
-                          {l.lesson_no > 0 && (
-                            <span className="shrink-0 tabular-nums">
-                              {l.lesson_no}/{l.total_hours}
-                            </span>
+          {weekDates.map((d, i) => {
+            const dateKey = dateKeys[i];
+            return (
+              <tr key={dateKey}>
+                <th className="border border-emerald-700 bg-emerald-50 px-0.5 py-0.5 text-center text-[9px] font-bold">
+                  {WEEKDAYS[i]}
+                  <div className="text-[8px] font-normal">{formatDate(d, "M/D")}</div>
+                </th>
+                {PERIODS.map((period) => {
+                  const lessons = byCell.get(`${dateKey}:${period}`) ?? [];
+                  const cancels = cancelledByCell.get(`${dateKey}:${period}`) ?? [];
+                  return (
+                    <td
+                      key={period}
+                      className="h-[58px] border border-emerald-700 px-1 py-0.5 align-top"
+                    >
+                      {lessons.map((l) => (
+                        <div key={l.class_code} className="mb-0.5">
+                          <div className="flex items-baseline justify-between gap-1">
+                            <span className="font-bold">{l.class_code}</span>
+                            {l.lesson_no > 0 && (
+                              <span className="shrink-0 tabular-nums text-slate-600">
+                                {l.lesson_no}/{l.total_hours}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate font-medium">{l.unit_name}</div>
+                          {l.content && (
+                            <div className="line-clamp-3 text-[7px] text-slate-700">
+                              {l.content}
+                            </div>
                           )}
                         </div>
-                        {l.content && (
-                          <div className="line-clamp-2 text-[8px] text-slate-700">
-                            {l.content}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {cancels.map((c) => (
-                      <div key={`x${c.class_code}`} className="text-slate-500">
-                        <span className="line-through">{c.class_code}</span>{" "}
-                        <span>休講{c.reason ? `（${c.reason}）` : ""}</span>
-                      </div>
-                    ))}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+                      ))}
+                      {cancels.map((c) => (
+                        <div key={`x${c.class_code}`} className="text-slate-500">
+                          <span className="line-through">{c.class_code}</span> 休講
+                          {c.reason && <div className="text-[7px]">（{c.reason}）</div>}
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
       {/* 下段：クラス別の時数 */}
-      <table className="mt-1.5 w-full table-fixed border-collapse text-[9px]">
+      <table className="mt-1.5 w-full table-fixed border-collapse text-[8px]">
         <thead>
           <tr>
-            <th className="w-20 border border-emerald-700 bg-emerald-50 px-1 py-0.5 text-left">
+            <th className="w-16 border border-emerald-700 bg-emerald-50 px-1 py-0.5 text-left">
               時数
             </th>
             {tallies.map((t) => (
@@ -191,7 +192,7 @@ export default function PrintWeeklySheet({
                 {t.class_code}
               </th>
             ))}
-            <th className="w-14 border border-emerald-700 bg-emerald-100 px-1 py-0.5 text-center font-bold">
+            <th className="w-12 border border-emerald-700 bg-emerald-100 px-1 py-0.5 text-center font-bold">
               合計
             </th>
           </tr>

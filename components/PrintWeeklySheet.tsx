@@ -84,9 +84,12 @@ export default function PrintWeeklySheet({
   ];
 
   return (
-    <div className="print-keep mx-auto w-full bg-white text-slate-900">
+    // 高さを紙の内寸（A4縦 297mm − 上下余白 8mm×2 = 281mm）に固定し、
+    // 縦フレックスでグリッドを伸ばす。**下に大きな余白を残さないため。**
+    // ヘッダーと時数表は必要な高さだけ取り、余りを全部グリッドに配る。
+    <div className="print-keep mx-auto flex h-[281mm] w-full flex-col bg-white text-slate-900">
       {/* ヘッダー：年度・週・期間・所属・検印 */}
-      <div className="mb-1.5 flex items-end justify-between border-b-2 border-emerald-700 pb-1">
+      <div className="mb-1.5 flex shrink-0 items-end justify-between border-b-2 border-emerald-700 pb-1">
         <div>
           <div className="text-sm font-bold">週案（理科専科）</div>
           <div className="mt-0.5 text-[10px]">
@@ -107,7 +110,8 @@ export default function PrintWeeklySheet({
       </div>
 
       {/* 週案グリッド：日（行）× 時限（列）。A4縦は横が狭いので日を行にする */}
-      <table className="w-full table-fixed border-collapse text-[8px] leading-tight">
+      <div className="min-h-0 flex-1">
+        <table className="h-full w-full table-fixed border-collapse text-[9px] leading-tight">
         <colgroup>
           <col style={{ width: "38px" }} />
           {PERIODS.map((p) => (
@@ -142,7 +146,7 @@ export default function PrintWeeklySheet({
                   return (
                     <td
                       key={period}
-                      className="h-[58px] border border-emerald-700 px-1 py-0.5 align-top"
+                      className="border border-emerald-700 px-1 py-0.5 align-top"
                     >
                       {lessons.map((l) => (
                         <div key={l.class_code} className="mb-0.5">
@@ -156,7 +160,7 @@ export default function PrintWeeklySheet({
                           </div>
                           <div className="truncate font-medium">{l.unit_name}</div>
                           {l.content && (
-                            <div className="line-clamp-3 text-[7px] text-slate-700">
+                            <div className="line-clamp-5 text-[8px] text-slate-700">
                               {l.content}
                             </div>
                           )}
@@ -174,11 +178,12 @@ export default function PrintWeeklySheet({
               </tr>
             );
           })}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
 
-      {/* 下段：クラス別の時数 */}
-      <table className="mt-1.5 w-full table-fixed border-collapse text-[8px]">
+      {/* 下段：クラス別の時数。高さは中身ぶんだけ取る */}
+      <table className="mt-1.5 w-full shrink-0 table-fixed border-collapse text-[8px]">
         <thead>
           <tr>
             <th className="w-16 border border-emerald-700 bg-emerald-50 px-1 py-0.5 text-left">

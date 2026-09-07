@@ -141,9 +141,14 @@ function PrintWeeklyContent() {
           時間割が未登録です。設定画面で基本時間割を入力してください。
         </p>
       ) : (
-        <>
-          {/* 画面ではA4横の紙面に見えるよう枠を付ける。印刷では枠を消す */}
-          <div className="print:border-0 print:p-0 print:shadow-none rounded border border-slate-300 bg-white p-4 shadow-sm">
+        <div className="overflow-x-auto print:overflow-visible">
+          {/*
+            画面でも A4縦（210 × 297mm、余白 8mm）の実寸で見せる。
+            画面幅いっぱいに広げると紙より横長になり、**印刷結果と字詰まりが変わって
+            プレビューの意味がなくなる**ため、mm 指定で紙と同じ寸法に固定する。
+            印刷時は @page が余白を持つので、幅・余白・影を落とす。
+          */}
+          <div className="mx-auto w-[210mm] min-h-[297mm] rounded border border-slate-300 bg-white p-[8mm] shadow-md print:m-0 print:min-h-0 print:w-auto print:rounded-none print:border-0 print:p-0 print:shadow-none">
             <PrintWeeklySheet
               setting={setting}
               weekNo={weekNo}
@@ -165,7 +170,7 @@ function PrintWeeklyContent() {
             （画面の時数表は確定した分だけを出します）。
             休講にしたコマは打ち消し線と理由つきで印刷され、時数には数えません。
           </p>
-        </>
+        </div>
       )}
     </div>
   );

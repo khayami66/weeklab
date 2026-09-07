@@ -363,14 +363,6 @@ function WeeklyPageContent() {
         </section>
       )}
 
-      {/* サマリ */}
-      {hasTimetable && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-700">週実施・実施累計</h2>
-          <WeekSummaryTable summary={summary} />
-        </section>
-      )}
-
       {/* 週案グリッド */}
       {hasTimetable && (
         <section>
@@ -406,6 +398,14 @@ function WeeklyPageContent() {
             各クラスの<strong>最初のコマ</strong>には「単元・本時」が付いています。
             前週が予定どおり進まなかったときは、そこで本時を戻してください。
           </p>
+        </section>
+      )}
+
+      {/* サマリ（週案グリッドの下。まず授業の中身を見て、そのあと時数を確かめる順にする） */}
+      {hasTimetable && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="mb-2 text-sm font-semibold text-slate-700">週実施・実施累計</h2>
+          <WeekSummaryTable summary={summary} />
         </section>
       )}
 

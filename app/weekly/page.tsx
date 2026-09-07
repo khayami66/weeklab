@@ -24,6 +24,7 @@ import {
   removeOverride,
 } from "@/lib/overrideEdit";
 import { advanceProgress } from "@/lib/progress";
+import { computeMonthlyHoursByClass } from "@/lib/summary";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
 import type {
   AnnualPlan,
@@ -163,6 +164,15 @@ function WeeklyPageContent() {
   );
 
   const hasTimetable = timetable.length > 0;
+
+  // 「月実施」：この週の**月曜が属する月**の全週を合計する（月次集計と同じ月基準）
+  const summaryMonth = monday.getMonth() + 1;
+  const monthlyHours = computeMonthlyHoursByClass(
+    monday.getFullYear(),
+    summaryMonth,
+    timetable,
+    overrides
+  );
 
   // ── 時間割の変更（週内例外）──
   // TimetableOverride は基本時間割への差分。取り消しは差分を消すだけで元に戻る。
@@ -404,8 +414,14 @@ function WeeklyPageContent() {
       {/* サマリ（週案グリッドの下。まず授業の中身を見て、そのあと時数を確かめる順にする） */}
       {hasTimetable && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-700">週実施・実施累計</h2>
-          <WeekSummaryTable summary={summary} />
+          <h2 className="mb-2 text-sm font-semibold text-slate-700">時数</h2>
+          <WeekSummaryTable summary={summary} monthlyHours={monthlyHours} month={summaryMonth} />
+          <p className="mt-2 text-xs text-slate-500">
+            <strong>週実施</strong>＝この週のコマ数／
+            <strong>月実施</strong>＝この週の月曜が属する月の全週の合計／
+            <strong>累計</strong>＝年度当初からの実施累計（この週を含む）。
+            休講にしたコマは数えていません。
+          </p>
         </section>
       )}
 

@@ -12,7 +12,7 @@ import type {
   WeekSummary,
 } from "@/types";
 import { formatDate, getMondayOf, getWeekDates, parseISODate } from "./date";
-import { generateWeeklyPlan } from "./weeklyPlan";
+import { buildWeekSlots, generateWeeklyPlan } from "./weeklyPlan";
 
 interface PackBundle {
   annualPlan: AnnualPlan[];
@@ -121,6 +121,34 @@ export function computeMonthSummary(
     month,
     class_tallies,
   };
+}
+
+/**
+ * その月のクラス別コマ数を数える（週案画面の「月実施」用）。
+ *
+ * **月基準は月曜日が属する月**（月次集計と同じルール）。
+ * その月の全週を対象にするので、月の途中の週を見ていても「その月の合計」が出る。
+ *
+ * コマ数は**時間割と例外だけで決まる**（どの単元をやるかには依らない）ので、
+ * `generateWeeklyPlan` を通さず `buildWeekSlots` で数える。
+ * 進度もカリキュラムパックも要らず、`computeMonthSummary` より軽い。
+ *
+ * 休講にしたコマは `buildWeekSlots` が `slots` から外すので、自動的に数えられない。
+ */
+export function computeMonthlyHoursByClass(
+  year: number,
+  month: number,
+  timetable: Timetable[],
+  overrides: TimetableOverride[]
+): Record<string, number> {
+  const hours: Record<string, number> = {};
+  for (const monday of collectMondaysForMonth(year, month)) {
+    const { slots } = buildWeekSlots(monday, timetable, overrides);
+    for (const s of slots) {
+      hours[s.class_code] = (hours[s.class_code] ?? 0) + 1;
+    }
+  }
+  return hours;
 }
 
 /**

@@ -110,11 +110,16 @@ export default function ViewpointBalanceTable({ classRows, students }: Props) {
               クラスごとにまとめ、横に並べる。
               全クラスを1列に混ぜて並べると縦に長くなり、右側が空いたまま
               「どのクラスに偏りが集中しているか」も読み取れないため。
-              クラス内は差の大きい順（students が既にその順）。
+
+              クラス内は**出席番号順**。差の大きい順ではない。
+              この画面は手元の名簿と突き合わせて見るものなので、
+              名簿と同じ並びのほうが探しやすい（差の大きさは列を見れば分かる）。
             */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {classRows.map(({ classCode }) => {
-                const members = students.filter((b) => b.class_code === classCode);
+                const members = students
+                  .filter((b) => b.class_code === classCode)
+                  .sort((a, b) => (a.student_no ?? 0) - (b.student_no ?? 0));
                 if (members.length === 0) return null;
                 return (
                   <div
@@ -189,7 +194,7 @@ export default function ViewpointBalanceTable({ classRows, students }: Props) {
 
             <p className="text-xs text-slate-500">
               知技＝{VIEWPOINT_LABELS.knowledge}／思判表＝{VIEWPOINT_LABELS.thinking}。
-              クラス内は差の大きい順です。
+              クラス内は出席番号順です。
             </p>
           </>
         )}

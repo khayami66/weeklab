@@ -391,8 +391,8 @@ function WeeklyPageContent() {
             firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
           />
           <p className="mt-2 text-xs text-slate-500">
-            祝日・行事でコマが動くときは、各コマの「変更」か、日付の下の
-            「＋授業を追加」「この日をなくす」を使ってください。
+            枠は月〜土 × 1〜6限で固定です。<strong>空きコマの「＋」から授業を追加</strong>でき、
+            各コマの「変更」で休講・クラス変更、日付の下の「この日をなくす」で祝日・行事に対応します。
             <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
             <br />
             各クラスの<strong>最初のコマ</strong>には「単元・本時」が付いています。

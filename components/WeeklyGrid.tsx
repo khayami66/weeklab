@@ -2,13 +2,22 @@
 
 import { useState } from "react";
 import { formatDate } from "@/lib/date";
-import type { AnnualPlan, CancelledSlot, FirstLessonConfirm, Weekday, WeeklyPlan } from "@/types";
+import type {
+  AnnualPlan,
+  CancelledSlot,
+  FirstLessonConfirm,
+  Weekday,
+  WeeklyPlan,
+} from "@/types";
 import AddSlotForm from "./AddSlotForm";
 import FirstLessonPicker from "./FirstLessonPicker";
 import LessonCard from "./LessonCard";
 import SlotActionMenu, { type SlotAction } from "./SlotActionMenu";
 
 const WEEKDAYS: readonly Weekday[] = ["月", "火", "水", "木", "金", "土"];
+
+/** 時限。基本時間割エディタと同じ 1〜6 限で固定 */
+const PERIODS = [1, 2, 3, 4, 5, 6];
 
 export type GridEditHandlers = {
   /** 選べるクラスコード（差し替え・追加の候補） */
@@ -53,8 +62,14 @@ type Props = {
 };
 
 /**
- * 週案の曜日別表示。
- * 月〜土の6列を横並びに、各列で当日の全コマを縦に並べる。
+ * 週案の表示。**月〜土 × 1〜6限のマトリクスで枠を固定する。**
+ *
+ * 以前は日ごとに「あるコマだけ」を縦に積んでいたため、
+ * 2限と4限の授業が隣り合って見え、**空き時間が読み取れなかった**。
+ * 枠を固定すると「1限は空き、2限に3-1、3限は空き」が一目で分かる。
+ *
+ * この形は印刷様式（Y案：月〜土 × 時限のグリッド）とも一致するので、
+ * 週案印刷（Phase 13）でそのまま流用できる。
  *
  * **休講コマ（`cancelled`）は打ち消し線で残す。**消してしまうと
  * 「なぜ時数が減ったか」が管理職にも本人にも分からなくなるため（本人決定）。
@@ -68,215 +83,256 @@ export default function WeeklyGrid({
   firstLesson,
   readOnly,
 }: Props) {
-  /** 開いている操作パネル。`${date}:${period}:${class}` または `add:${date}` */
+  /** 開いているパネル。`slot:${key}` / `first:${key}` / `add:${date}:${period}` */
   const [openKey, setOpenKey] = useState<string | null>(null);
-
-  const byDate = new Map<string, WeeklyPlan[]>();
-  for (const p of plan) {
-    const list = byDate.get(p.date) ?? [];
-    list.push(p);
-    byDate.set(p.date, list);
-  }
-  for (const list of byDate.values()) {
-    list.sort((a, b) => a.period - b.period);
-  }
-
-  const cancelledByDate = new Map<string, CancelledSlot[]>();
-  for (const c of cancelled) {
-    const list = cancelledByDate.get(c.date) ?? [];
-    list.push(c);
-    cancelledByDate.set(c.date, list);
-  }
 
   const canEdit = Boolean(edit) && !readOnly;
   const canPickFirst = Boolean(firstLesson) && !readOnly;
 
+  /** `${date}:${period}` → その枠の授業 */
+  const byCell = new Map<string, WeeklyPlan[]>();
+  for (const p of plan) {
+    const k = `${p.date}:${p.period}`;
+    const list = byCell.get(k) ?? [];
+    list.push(p);
+    byCell.set(k, list);
+  }
+
+  /** `${date}:${period}` → その枠の休講 */
+  const cancelledByCell = new Map<string, CancelledSlot[]>();
+  for (const c of cancelled) {
+    const k = `${c.date}:${c.period}`;
+    const list = cancelledByCell.get(k) ?? [];
+    list.push(c);
+    cancelledByCell.set(k, list);
+  }
+
+  const countByDate = new Map<string, number>();
+  for (const p of plan) {
+    countByDate.set(p.date, (countByDate.get(p.date) ?? 0) + 1);
+  }
+
   /**
    * 各クラスの「その週の最初のコマ」を特定する。
-   * plan は既に日付・時限順なので、クラスごとの初出がそれにあたる。
+   * 日付・時限順に走査したときのクラスごとの初出。
    * 休講で月曜が消えれば火曜が最初になる（例外適用後の並びで決まる）。
    */
   const firstSlotKey = new Map<string, string>();
-  for (const p of [...plan].sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period)) {
+  for (const p of [...plan].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.period - b.period
+  )) {
     if (!firstSlotKey.has(p.class_code)) {
       firstSlotKey.set(p.class_code, `${p.date}:${p.period}:${p.class_code}`);
     }
   }
 
+  const dateKeys = weekDates.map((d) => formatDate(d, "YYYY-MM-DD"));
+
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-      {weekDates.map((date, i) => {
-        const dateKey = formatDate(date, "YYYY-MM-DD");
-        const lessons = byDate.get(dateKey) ?? [];
-        const cancels = cancelledByDate.get(dateKey) ?? [];
-        const weekday = WEEKDAYS[i];
-        const isEmptyDay = lessons.length === 0 && cancels.length === 0;
-        const addKey = `add:${dateKey}`;
-
-        return (
-          <section
-            key={dateKey}
-            className={`rounded-lg border p-3 ${
-              isEmptyDay ? "border-slate-100 bg-slate-50" : "border-slate-200 bg-white"
-            }`}
-          >
-            <header className="mb-2 border-b border-slate-100 pb-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-semibold text-slate-700">
-                  {weekday}
-                  <span className="ml-1 text-xs text-slate-500">
-                    {formatDate(date, "M/D")}
+    <div className="overflow-x-auto">
+      <div className="min-w-[900px]">
+        {/* 曜日ヘッダー */}
+        <div className="grid grid-cols-[56px_repeat(6,minmax(0,1fr))] gap-2">
+          <div />
+          {weekDates.map((date, i) => {
+            const dateKey = dateKeys[i];
+            const count = countByDate.get(dateKey) ?? 0;
+            return (
+              <div
+                key={dateKey}
+                className="rounded-t-lg border-b-2 border-slate-200 bg-white px-2 py-1.5"
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-slate-700">
+                    {WEEKDAYS[i]}
+                    <span className="ml-1 text-xs font-normal text-slate-500">
+                      {formatDate(date, "M/D")}
+                    </span>
                   </span>
-                </span>
-                {lessons.length > 0 && (
-                  <span className="text-xs text-slate-500">{lessons.length}コマ</span>
-                )}
-              </div>
-
-              {canEdit && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  <span className="text-xs text-slate-500">
+                    {count > 0 ? `${count}コマ` : "—"}
+                  </span>
+                </div>
+                {canEdit && count > 0 && (
                   <button
                     type="button"
-                    onClick={() => setOpenKey(openKey === addKey ? null : addKey)}
-                    className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50"
+                    onClick={() => {
+                      const reason = window.prompt(
+                        `${formatDate(date, "M/D")} の授業をすべて休講にします。理由を入力してください（祝日・行事など）`,
+                        ""
+                      );
+                      if (reason === null) return;
+                      edit!.onCancelWholeDay(dateKey, reason.trim());
+                    }}
+                    className="mt-1 text-xs text-slate-500 underline hover:text-rose-600"
                   >
-                    ＋授業を追加
+                    この日をなくす
                   </button>
-                  {lessons.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const reason = window.prompt(
-                          `${formatDate(date, "M/D")} の授業をすべて休講にします。\n理由を入力してください（祝日・行事など）`,
-                          ""
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 時限 × 曜日 */}
+        {PERIODS.map((period) => (
+          <div
+            key={period}
+            className="grid grid-cols-[56px_repeat(6,minmax(0,1fr))] items-stretch gap-2 border-b border-slate-100 py-2"
+          >
+            <div className="flex items-start justify-end pr-1 pt-2">
+              <span className="text-xs font-medium tabular-nums text-slate-500">
+                {period}限
+              </span>
+            </div>
+
+            {dateKeys.map((dateKey) => {
+              const cellKey = `${dateKey}:${period}`;
+              const lessons = byCell.get(cellKey) ?? [];
+              const cancels = cancelledByCell.get(cellKey) ?? [];
+              const addKey = `add:${cellKey}`;
+              const isEmpty = lessons.length === 0 && cancels.length === 0;
+
+              return (
+                <div key={cellKey} className="min-w-0">
+                  {isEmpty ? (
+                    canEdit ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setOpenKey(openKey === addKey ? null : addKey)}
+                          className="h-full min-h-16 w-full rounded-lg border border-dashed border-slate-200 text-xs text-slate-300 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                          title={`${dateKey} ${period}限に授業を追加`}
+                        >
+                          ＋
+                        </button>
+                        {openKey === addKey && (
+                          <AddSlotForm
+                            classCodes={edit!.classCodes}
+                            fixedPeriod={period}
+                            onAdd={(p, classCode, memo) => {
+                              edit!.onAddSlot(dateKey, p, classCode, memo);
+                              setOpenKey(null);
+                            }}
+                            onClose={() => setOpenKey(null)}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <div className="h-full min-h-16 rounded-lg border border-dashed border-slate-100" />
+                    )
+                  ) : (
+                    <div className="space-y-2">
+                      {lessons.map((lesson) => {
+                        const key = `${lesson.date}:${lesson.period}:${lesson.class_code}`;
+                        return (
+                          <div key={key}>
+                            <LessonCard lesson={lesson} compact />
+                            {canEdit && (
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setOpenKey(openKey === `slot:${key}` ? null : `slot:${key}`)
+                                  }
+                                  className="text-xs text-slate-500 underline hover:text-slate-700"
+                                >
+                                  変更
+                                </button>
+                                {lesson.is_override && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      edit!.onRestore(
+                                        lesson.date,
+                                        lesson.period,
+                                        lesson.class_code
+                                      )
+                                    }
+                                    className="text-xs text-blue-600 underline hover:text-blue-800"
+                                  >
+                                    戻す
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {canPickFirst && firstSlotKey.get(lesson.class_code) === key && (
+                              <FirstLessonBlock
+                                lesson={lesson}
+                                handlers={firstLesson!}
+                                open={openKey === `first:${key}`}
+                                onToggle={() =>
+                                  setOpenKey(openKey === `first:${key}` ? null : `first:${key}`)
+                                }
+                                onClose={() => setOpenKey(null)}
+                              />
+                            )}
+                            {canEdit && openKey === `slot:${key}` && (
+                              <SlotActionMenu
+                                classCode={lesson.class_code}
+                                classCodes={edit!.classCodes}
+                                onApply={(action: SlotAction) => {
+                                  if (action.type === "cancel") {
+                                    edit!.onCancelSlot(
+                                      lesson.date,
+                                      lesson.period,
+                                      lesson.class_code,
+                                      action.reason
+                                    );
+                                  } else {
+                                    edit!.onReplaceSlot(
+                                      lesson.date,
+                                      lesson.period,
+                                      lesson.class_code,
+                                      action.toClassCode,
+                                      action.memo
+                                    );
+                                  }
+                                  setOpenKey(null);
+                                }}
+                                onClose={() => setOpenKey(null)}
+                              />
+                            )}
+                          </div>
                         );
-                        if (reason === null) return;
-                        edit!.onCancelWholeDay(dateKey, reason.trim());
-                      }}
-                      className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-rose-50"
-                    >
-                      この日をなくす
-                    </button>
-                  )}
-                </div>
-              )}
+                      })}
 
-              {canEdit && openKey === addKey && (
-                <AddSlotForm
-                  classCodes={edit!.classCodes}
-                  onAdd={(period, classCode, memo) => {
-                    edit!.onAddSlot(dateKey, period, classCode, memo);
-                    setOpenKey(null);
-                  }}
-                  onClose={() => setOpenKey(null)}
-                />
-              )}
-            </header>
-
-            {isEmptyDay ? (
-              <p className="text-xs text-slate-400">授業なし</p>
-            ) : (
-              <div className="space-y-2">
-                {lessons.map((lesson) => {
-                  const key = `${lesson.date}:${lesson.period}:${lesson.class_code}`;
-                  return (
-                    <div key={key}>
-                      <LessonCard lesson={lesson} />
-                      {canEdit && (
-                        <div className="mt-1 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setOpenKey(openKey === key ? null : key)}
-                            className="text-xs text-slate-500 underline hover:text-slate-700"
-                          >
-                            変更
-                          </button>
-                          {lesson.is_override && (
+                      {/* 休講：打ち消し線で残す。時数には数えられていない */}
+                      {cancels.map((c) => (
+                        <div
+                          key={`x:${c.date}:${c.period}:${c.class_code}`}
+                          className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-400 line-through">
+                              {c.class_code}
+                            </span>
+                            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-600">
+                              休講
+                            </span>
+                          </div>
+                          {c.reason && (
+                            <p className="mt-1 text-xs text-slate-500">{c.reason}</p>
+                          )}
+                          {canEdit && (
                             <button
                               type="button"
-                              onClick={() =>
-                                edit!.onRestore(lesson.date, lesson.period, lesson.class_code)
-                              }
-                              className="text-xs text-blue-600 underline hover:text-blue-800"
+                              onClick={() => edit!.onRestore(c.date, c.period, c.class_code)}
+                              className="mt-1 text-xs text-blue-600 underline hover:text-blue-800"
                             >
                               戻す
                             </button>
                           )}
                         </div>
-                      )}
-                      {canPickFirst && firstSlotKey.get(lesson.class_code) === key && (
-                        <FirstLessonBlock
-                          lesson={lesson}
-                          handlers={firstLesson!}
-                          open={openKey === `first:${key}`}
-                          onToggle={() =>
-                            setOpenKey(openKey === `first:${key}` ? null : `first:${key}`)
-                          }
-                          onClose={() => setOpenKey(null)}
-                        />
-                      )}
-                      {canEdit && openKey === key && (
-                        <SlotActionMenu
-                          classCode={lesson.class_code}
-                          classCodes={edit!.classCodes}
-                          onApply={(action: SlotAction) => {
-                            if (action.type === "cancel") {
-                              edit!.onCancelSlot(
-                                lesson.date,
-                                lesson.period,
-                                lesson.class_code,
-                                action.reason
-                              );
-                            } else {
-                              edit!.onReplaceSlot(
-                                lesson.date,
-                                lesson.period,
-                                lesson.class_code,
-                                action.toClassCode,
-                                action.memo
-                              );
-                            }
-                            setOpenKey(null);
-                          }}
-                          onClose={() => setOpenKey(null)}
-                        />
-                      )}
+                      ))}
                     </div>
-                  );
-                })}
-
-                {/* 休講コマ：打ち消し線で残す。時数には数えられていない */}
-                {cancels.map((c) => (
-                  <div
-                    key={`x:${c.date}:${c.period}:${c.class_code}`}
-                    className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400">{c.period}限</span>
-                      <span className="rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
-                        休講
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-400 line-through">{c.class_code}</p>
-                    {c.reason && (
-                      <p className="mt-1 text-xs text-slate-500">{c.reason}</p>
-                    )}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => edit!.onRestore(c.date, c.period, c.class_code)}
-                        className="mt-1.5 text-xs text-blue-600 underline hover:text-blue-800"
-                      >
-                        戻す
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -305,7 +361,7 @@ function FirstLessonBlock({
 
   return (
     <>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1 flex flex-wrap items-center gap-2">
         <span
           className={`rounded px-1.5 py-0.5 text-xs ${
             isConfirmed ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"

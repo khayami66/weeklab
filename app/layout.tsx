@@ -33,7 +33,7 @@ export default function RootLayout({
             成績入力のような横に広い表があるとページ全体が横に伸び、
             表の中の overflow-x-auto が効かなくなる（サイドナビも押し出される）。
           */}
-          <main className="min-w-0 flex-1 p-6">{children}</main>
+          <main className="print-page min-w-0 flex-1 p-6">{children}</main>
         </div>
         <MobileNav />
       </body>

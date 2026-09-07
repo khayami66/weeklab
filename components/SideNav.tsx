@@ -25,7 +25,7 @@ const items = [
  */
 export default function SideNav() {
   return (
-    <nav className="hidden w-48 shrink-0 border-r border-slate-200 bg-white md:block">
+    <nav className="no-print hidden w-48 shrink-0 border-r border-slate-200 bg-white md:block">
       <ul className="sticky top-0 max-h-screen overflow-y-auto py-4">
         {items.map((item) => (
           <li key={item.href}>

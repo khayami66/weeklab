@@ -25,7 +25,7 @@ export default function Header() {
   const yearLabel = setting ? `${setting.school_year}年度` : "年度";
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="no-print border-b border-slate-200 bg-white">
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex items-baseline gap-3">
           <span className="text-xl font-bold text-blue-600">Weeklab</span>

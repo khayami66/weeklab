@@ -16,3 +16,40 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* ================================================================
+   印刷（週案・月次集計）
+   画面の操作要素を落とし、A4横1枚に収める。
+   ================================================================ */
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@media print {
+  /* ナビ・ボタン・説明など、紙に不要なものは `no-print` を付けて消す */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 画面用の余白と背景を落とす（紙面を最大限使う） */
+  body {
+    background: #fff;
+  }
+  .print-page {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 罫線と文字を確実に出す（既定では背景色が省かれる） */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 週案は1枚に収める前提。途中で切れないようにする */
+  .print-keep {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

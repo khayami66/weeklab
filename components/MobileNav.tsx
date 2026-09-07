@@ -10,7 +10,7 @@ const items = [
 
 export default function MobileNav() {
   return (
-    <nav className="md:hidden border-t border-slate-200 bg-white">
+    <nav className="no-print md:hidden border-t border-slate-200 bg-white">
       <ul className="flex justify-around py-2">
         {items.map((item) => (
           <li key={item.href}>

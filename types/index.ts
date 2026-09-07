@@ -162,6 +162,23 @@ export interface WeeklyPlan {
   override_memo: string;
 }
 
+/**
+ * 行事・祝日でなくなったコマ。
+ *
+ * `WeeklyPlan[]` とは**別の配列**で持つ。plan の件数が
+ * 週実施時数（`computeWeekSummary`）・進度の前進（今週を実施済みに確定）・
+ * 月次集計（`computeMonthSummary`）の根拠になっており、
+ * 混ぜると**時数が過大に数えられ、進度が実際より進む**ため。
+ */
+export interface CancelledSlot {
+  date: string;
+  weekday: Weekday;
+  period: number;
+  class_code: string;
+  grade: number;
+  reason: string; // TimetableOverride.memo（例：運動会練習）
+}
+
 export interface ClassTally {
   class_code: string;
   weekly_hours: number;

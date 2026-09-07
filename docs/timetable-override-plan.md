@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 |---|---|
 | 文書名 | 週内例外の編集UI 実装プラン |
-| バージョン | 1.2 |
+| バージョン | 1.3 |
 | 作成日 | 2026-09-07 |
-| ステータス | **レビュー待ち（実装未着手）** |
+| ステータス | **実装完了（2026-09-07）** |
 | 対象 | 要件定義書 F04 ／ 作業工程手順書 Phase 12 の残タスク |
 | 関連 | `data_model.md`（`TimetableOverride`）／ `screen_design.md` |
 
@@ -223,47 +223,47 @@ export interface CancelledSlot {
 ## 4. 実装手順（チェックリスト）
 
 ### 4.1 ロジック層
-- [ ] `types/index.ts` に `CancelledSlot` を追加
-- [ ] `buildWeekSlots` を `{ slots, cancelled }` 返却に変更
-- [ ] `generateWeeklyPlan` の戻り値に `cancelled` を追加
-- [ ] `lib/weeklyPlan.test.ts` にテスト追加
-  - [ ] `cancel` したコマが `plan` に**入らない**（時数が増えない）
-  - [ ] `cancel` したコマが `cancelled` に**理由つきで入る**
-  - [ ] `replace` は `plan` に入り `is_override=true`
-  - [ ] `add` は `plan` に入る
-  - [ ] 同じ日に cancel と add が混在しても正しい
-- [ ] **既存56テストが1件も壊れないこと**を確認
+- [x] `types/index.ts` に `CancelledSlot` を追加
+- [x] `buildWeekSlots` を `{ slots, cancelled }` 返却に変更
+- [x] `generateWeeklyPlan` の戻り値に `cancelled` を追加
+- [x] `lib/weeklyPlan.test.ts` にテスト追加
+  - [x] `cancel` したコマが `plan` に**入らない**（時数が増えない）
+  - [x] `cancel` したコマが `cancelled` に**理由つきで入る**
+  - [x] `replace` は `plan` に入り `is_override=true`
+  - [x] `add` は `plan` に入る
+  - [x] 同じ日に cancel と add が混在しても正しい
+- [x] **既存56テストが1件も壊れないこと**を確認
 
 ### 4.2 編集ロジック（純粋関数）
-- [ ] `lib/overrideEdit.ts` を新規作成 ＋ テスト
-  - [ ] `cancelSlot(overrides, date, period, classCode, reason)`
-  - [ ] `cancelWholeDay(overrides, date, slotsOfDay, reason)`
-  - [ ] `addSlot(overrides, date, period, classCode, memo)`
-  - [ ] `replaceSlot(overrides, date, period, from, to, memo)`
-  - [ ] `removeOverride(overrides, date, period, classCode)`（＝戻す）
-  - [ ] **同じ日・時限・クラスに二重の override を作らない**（重複ガード）
+- [x] `lib/overrideEdit.ts` を新規作成 ＋ テスト
+  - [x] `cancelSlot(overrides, date, period, classCode, reason)`
+  - [x] `cancelWholeDay(overrides, date, slotsOfDay, reason)`
+  - [x] `addSlot(overrides, date, period, classCode, memo)`
+  - [x] `replaceSlot(overrides, date, period, from, to, memo)`
+  - [x] `removeOverride(overrides, date, period, classCode)`（＝戻す）
+  - [x] **同じ日・時限・クラスに二重の override を作らない**（重複ガード）
 
 ### 4.3 UI
-- [ ] `components/SlotActionMenu.tsx`（コマの変更メニュー）
-  - [ ] **後から「単元を変える」を足せる構造にする**（§1.5）
-- [ ] `components/AddSlotForm.tsx`（時限・クラス・理由）
-- [ ] `components/WeeklyGrid.tsx`：`cancelled` を受け取って描画、操作ボタンを配置
-- [ ] `app/weekly/page.tsx`：`useOverrides().save` に接続、変更件数の表示
-- [ ] 持ち越しの導線（§1.5.1）
-  - [ ] 先頭コマ確定エリアに「前週が予定どおり進まなかった場合はここで戻せます」
-  - [ ] 確定後のトーストに進度管理画面へのリンク
+- [x] `components/SlotActionMenu.tsx`（コマの変更メニュー）
+  - [x] **後から「単元を変える」を足せる構造にする**（§1.5）
+- [x] `components/AddSlotForm.tsx`（時限・クラス・理由）
+- [x] `components/WeeklyGrid.tsx`：`cancelled` を受け取って描画、操作ボタンを配置
+- [x] `app/weekly/page.tsx`：`useOverrides().save` に接続、変更件数の表示
+- [x] 持ち越しの導線（§1.5.1）
+  - [x] 先頭コマ確定エリアに「前週が予定どおり進まなかった場合はここで戻せます」
+  - [x] 確定後のトーストに進度管理画面へのリンク
 
 ### 4.4 検証
-- [ ] tsc 0 / eslint 0（変更ファイル）/ 全テストパス / build 成功
-- [ ] **ヘッドレスEdge で実操作**
-  - [ ] コマを休講にする → 打ち消し線で残る／**週実施時数が1減る**
-  - [ ] 「この日をなくす」→ その日の全コマが休講になる
-  - [ ] 授業を追加 → コマが増え、**週実施時数が1増える**
-  - [ ] クラスを変える → 変更バッジが出る
-  - [ ] 「戻す」→ 元の状態に戻る
-  - [ ] **リロードしても変更が残る**
-  - [ ] 「今週を実施済みに確定」で、**休講を除いたコマ数だけ進度が進む**
-  - [ ] 持ち越し：確定後に翌週の先頭コマで本時を戻すと、**累計時数は保たれたまま
+- [x] tsc 0 / eslint 0（変更ファイル）/ 全テストパス / build 成功
+- [x] **ヘッドレスEdge で実操作**
+  - [x] コマを休講にする → 打ち消し線で残る／**週実施時数が1減る**
+  - [x] 「この日をなくす」→ その日の全コマが休講になる
+  - [x] 授業を追加 → コマが増え、**週実施時数が1増える**
+  - [x] クラスを変える → 変更バッジが出る
+  - [x] 「戻す」→ 元の状態に戻る
+  - [x] **リロードしても変更が残る**
+  - [x] 「今週を実施済みに確定」で、**休講を除いたコマ数だけ進度が進む**
+  - [x] 持ち越し：確定後に翌週の先頭コマで本時を戻すと、**累計時数は保たれたまま
         単元内の進み具合だけ戻る**
 
 ---

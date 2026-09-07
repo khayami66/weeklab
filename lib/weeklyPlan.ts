@@ -1,5 +1,6 @@
 import type {
   AnnualPlan,
+  CancelledSlot,
   ClassProgress,
   FirstLessonConfirm,
   LessonMaster,
@@ -51,17 +52,22 @@ interface PackBundle {
 
 /**
  * 基本時間割と例外をマージして、指定週（月〜土）の全コマを Slot 列にする。
- *   cancel  : 該当コマ削除
+ *   cancel  : 実施コマから外し、`cancelled` に理由つきで積む
  *   replace : class_code を new_class_code に差し替え
  *   add     : 指定 date/period のコマを追加
+ *
+ * **休講コマを `slots` に混ぜない。** `slots` の件数がそのまま
+ * 週実施時数・進度の前進量になるため、混ぜると時数が過大に数えられる。
+ * 画面に「休講」として出すために、別配列で返す。
  */
 export function buildWeekSlots(
   weekStart: Date,
   timetable: Timetable[],
   overrides: TimetableOverride[]
-): Slot[] {
+): { slots: Slot[]; cancelled: CancelledSlot[] } {
   const dates = getWeekDates(weekStart); // 月〜土6日分
   const slots: Slot[] = [];
+  const cancelled: CancelledSlot[] = [];
 
   for (const date of dates) {
     const weekday = dayIndexToWeekday(date.getDay());
@@ -93,7 +99,15 @@ export function buildWeekSlots(
         continue;
       }
       if (ov.change_type === "cancel") {
-        // 削除（何もしない）
+        // 実施コマからは外すが、画面・印刷に「休講」として出すため記録する
+        cancelled.push({
+          date: dateStr,
+          weekday,
+          period: slot.period,
+          class_code: slot.class_code,
+          grade: slot.grade,
+          reason: ov.memo,
+        });
         continue;
       }
       if (ov.change_type === "replace" && ov.new_class_code) {
@@ -127,7 +141,8 @@ export function buildWeekSlots(
     slots.push(...afterReplace);
   }
 
-  return slots;
+  cancelled.sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period);
+  return { slots, cancelled };
 }
 
 function parseGradeFromClassCode(classCode: string): number | null {
@@ -158,8 +173,8 @@ export function generateWeeklyPlan(
   progress: ClassProgress[],
   packs: Record<string, PackBundle>,
   firstLessonConfirms: FirstLessonConfirm[] = []
-): { plan: WeeklyPlan[]; summary: WeekSummary } {
-  const slots = buildWeekSlots(weekStart, timetable, overrides);
+): { plan: WeeklyPlan[]; summary: WeekSummary; cancelled: CancelledSlot[] } {
+  const { slots, cancelled } = buildWeekSlots(weekStart, timetable, overrides);
 
   // クラスごとの仮進度マップを初期化
   const virtualState: Record<string, VirtualState> = {};
@@ -285,7 +300,7 @@ export function generateWeeklyPlan(
     })),
   };
 
-  return { plan, summary };
+  return { plan, summary, cancelled };
 }
 
 /**

@@ -16,6 +16,15 @@ import { useSetting } from "@/hooks/useSetting";
 import { useTimetable } from "@/hooks/useTimetable";
 import { formatDate, getMondayOf, getWeekDates, parseISODate } from "@/lib/date";
 import { localDataSource } from "@/lib/datasource/localDataSource";
+import {
+  addSlot,
+  cancelSlot,
+  cancelWholeDay,
+  clearWeekOverrides,
+  overridesInWeek,
+  removeOverride,
+  replaceSlot,
+} from "@/lib/overrideEdit";
 import { advanceProgress } from "@/lib/progress";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
 import type {
@@ -23,6 +32,7 @@ import type {
   ClassProgress,
   FirstLessonConfirm,
   LessonMaster,
+  TeacherSetting,
 } from "@/types";
 import { getActivePacks } from "@/types";
 
@@ -80,7 +90,7 @@ function WeeklyPageContent() {
   // データ取得
   const { setting, loading: settingLoading } = useSetting();
   const { timetable, loading: ttLoading } = useTimetable();
-  const { overrides, loading: ovLoading } = useOverrides();
+  const { overrides, loading: ovLoading, save: saveOverrides } = useOverrides();
   const { progress, loading: progLoading, save: saveProgress } = useClassProgress();
   const { confirms, loading: confLoading, save: saveConfirms } = useFirstLessonConfirms(mondayKey);
 
@@ -148,7 +158,7 @@ function WeeklyPageContent() {
   const weekDates = getWeekDates(monday);
 
   // 週案生成（draft の確定値を使う）
-  const { plan, summary } = generateWeeklyPlan(
+  const { plan, summary, cancelled } = generateWeeklyPlan(
     monday,
     setting,
     timetable,
@@ -159,6 +169,51 @@ function WeeklyPageContent() {
   );
 
   const hasTimetable = timetable.length > 0;
+
+  // ── 時間割の変更（週内例外）──
+  // TimetableOverride は基本時間割への差分。取り消しは差分を消すだけで元に戻る。
+  const weekDateKeys = weekDates.map((d) => formatDate(d, "YYYY-MM-DD"));
+  const weekOverrides = overridesInWeek(overrides, weekDateKeys);
+  const classCodes = listClassCodes(setting);
+
+  const applyOverrides = async (next: typeof overrides, message: string) => {
+    try {
+      await saveOverrides(next);
+      setToastKind("success");
+      setToast(message);
+    } catch (err) {
+      setToastKind("error");
+      setToast(`保存に失敗しました: ${String(err)}`);
+    }
+  };
+
+  const editHandlers = {
+    classCodes,
+    onCancelSlot: (date: string, period: number, code: string, reason: string) =>
+      applyOverrides(cancelSlot(overrides, date, period, code, reason), "休講にしました"),
+    onReplaceSlot: (date: string, period: number, from: string, to: string, memo: string) =>
+      applyOverrides(
+        replaceSlot(overrides, date, period, from, to, memo),
+        `${from} を ${to} に変更しました`
+      ),
+    onAddSlot: (date: string, period: number, code: string, memo: string) =>
+      applyOverrides(addSlot(overrides, date, period, code, memo), "授業を追加しました"),
+    onCancelWholeDay: (date: string, reason: string) => {
+      const slotsOfDay = plan.filter((pl) => pl.date === date);
+      return applyOverrides(
+        cancelWholeDay(overrides, date, slotsOfDay, reason),
+        `${date} を休講にしました`
+      );
+    },
+    onRestore: (date: string, period: number, code: string) =>
+      applyOverrides(removeOverride(overrides, date, period, code), "元に戻しました"),
+  };
+
+  const handleClearWeek = async () => {
+    if (!window.confirm("この週の時間割の変更をすべて取り消して、基本時間割に戻します。よろしいですか？"))
+      return;
+    await applyOverrides(clearWeekOverrides(overrides, weekDateKeys), "この週の変更を取り消しました");
+  };
 
   // 先頭コマ draft の更新
   const handleConfirmChange = (classCode: string, next: FirstLessonConfirm | null) => {
@@ -303,6 +358,20 @@ function WeeklyPageContent() {
           >
             確定を取り消す
           </button>
+          {/*
+            持ち越しの導線（実装プラン §1.5.1）。
+            確定は「予定どおり進んだ」前提でコマ数だけ進度を進めるので、
+            実際より進んでしまうことがある。押した直後が気づく唯一のタイミング。
+          */}
+          <p className="mt-2 text-xs text-emerald-700">
+            授業が予定どおり進まなかった場合は、
+            <strong>翌週の「週先頭コマの確定」で本時を戻せます</strong>
+            （実施累計はそのまま保たれます）。すぐ直すなら{" "}
+            <Link href="/progress" className="underline">
+              進度管理
+            </Link>
+            {" "}で完了時数を修正してください。
+          </p>
         </section>
       )}
 
@@ -322,6 +391,8 @@ function WeeklyPageContent() {
               <h2 className="text-sm font-semibold text-slate-700">週先頭コマの確定</h2>
               <p className="mt-1 text-xs text-slate-500">
                 各クラスの今週最初のコマを指定します。未確定の場合は ClassProgress からの推定値が使われます。
+                <br />
+                <strong>前週が予定どおり進まなかった場合は、ここで本時を戻せます。</strong>
               </p>
             </div>
             <button
@@ -357,8 +428,34 @@ function WeeklyPageContent() {
       {/* 週案グリッド */}
       {hasTimetable && (
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-slate-700">週の授業</h2>
-          <WeeklyGrid plan={plan} weekDates={weekDates} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-700">週の授業</h2>
+            {weekOverrides.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  この週の変更 {weekOverrides.length}件
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearWeek}
+                  className="text-xs text-blue-600 underline hover:text-blue-800"
+                >
+                  すべて取り消す
+                </button>
+              </div>
+            )}
+          </div>
+          <WeeklyGrid
+            plan={plan}
+            weekDates={weekDates}
+            cancelled={cancelled}
+            edit={isConfirmedWeek ? undefined : editHandlers}
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            祝日・行事でコマが動くときは、各コマの「変更」か、日付の下の
+            「＋授業を追加」「この日をなくす」を使ってください。
+            <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
+          </p>
         </section>
       )}
 
@@ -384,6 +481,15 @@ function WeeklyPageContent() {
       <Toast message={toast} kind={toastKind} onDismiss={() => setToast(null)} />
     </div>
   );
+}
+
+/** grade_configs から `{学年}-{組}` 形式のクラスコード一覧を作る */
+function listClassCodes(setting: TeacherSetting): string[] {
+  const codes: string[] = [];
+  for (const g of setting.grade_configs) {
+    for (let i = 1; i <= g.class_count; i++) codes.push(`${g.grade}-${i}`);
+  }
+  return codes;
 }
 
 function cmpByClass(a: FirstLessonConfirm, b: FirstLessonConfirm): number {

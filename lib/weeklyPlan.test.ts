@@ -164,6 +164,119 @@ describe("generateWeeklyPlan - TimetableOverride", () => {
   });
 });
 
+describe("generateWeeklyPlan - 休講コマ（cancelled）", () => {
+  const cancelMon1 = [
+    {
+      date: "2026-04-06",
+      period: 1,
+      original_class_code: "3-1",
+      new_class_code: null,
+      change_type: "cancel" as const,
+      memo: "運動会リハ",
+    },
+  ];
+
+  const run = (overrides: typeof cancelMon1) =>
+    generateWeeklyPlan(
+      WEEK1_MONDAY,
+      testSetting,
+      testTimetable,
+      overrides,
+      [progressG3Start, progressG4Start],
+      testPacks,
+      []
+    );
+
+  it("休講コマは cancelled に理由つきで入る", () => {
+    const { cancelled } = run(cancelMon1);
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0]).toMatchObject({
+      date: "2026-04-06",
+      period: 1,
+      class_code: "3-1",
+      reason: "運動会リハ",
+    });
+  });
+
+  it("休講コマは plan に入らない＝週実施時数が増えない（時数の過大計上を防ぐ）", () => {
+    const { plan: before, summary: sBefore } = run([]);
+    const { plan: after, summary: sAfter } = run(cancelMon1);
+
+    // plan の件数が1つ減る
+    expect(after).toHaveLength(before.length - 1);
+
+    // 3-1 の週実施時数がちょうど1減る（他クラスは変わらない）
+    const weekly = (s: typeof sBefore, code: string) =>
+      s.class_tallies.find((t) => t.class_code === code)!.weekly_hours;
+    expect(weekly(sAfter, "3-1")).toBe(weekly(sBefore, "3-1") - 1);
+    expect(weekly(sAfter, "4-1")).toBe(weekly(sBefore, "4-1"));
+  });
+
+  it("休講が無ければ cancelled は空", () => {
+    expect(run([]).cancelled).toEqual([]);
+  });
+
+  it("replace / add では cancelled に入らない", () => {
+    const { cancelled: rep } = generateWeeklyPlan(
+      WEEK1_MONDAY, testSetting, testTimetable,
+      [{ date: "2026-04-06", period: 1, original_class_code: "3-1",
+         new_class_code: "4-1", change_type: "replace" as const, memo: "振替" }],
+      [progressG3Start, progressG4Start], testPacks, []
+    );
+    expect(rep).toEqual([]);
+
+    const { cancelled: add } = generateWeeklyPlan(
+      WEEK1_MONDAY, testSetting, testTimetable,
+      [{ date: "2026-04-11", period: 1, original_class_code: null,
+         new_class_code: "3-1", change_type: "add" as const, memo: "土曜補講" }],
+      [progressG3Start, progressG4Start], testPacks, []
+    );
+    expect(add).toEqual([]);
+  });
+
+  it("同じ日に cancel と add が混在しても、それぞれ正しい配列に入る", () => {
+    const { plan, cancelled } = generateWeeklyPlan(
+      WEEK1_MONDAY,
+      testSetting,
+      testTimetable,
+      [
+        { date: "2026-04-06", period: 1, original_class_code: "3-1",
+          new_class_code: null, change_type: "cancel" as const, memo: "行事" },
+        { date: "2026-04-06", period: 5, original_class_code: null,
+          new_class_code: "3-1", change_type: "add" as const, memo: "振替先" },
+      ],
+      [progressG3Start, progressG4Start],
+      testPacks,
+      []
+    );
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0].period).toBe(1);
+    expect(plan.find((p) => p.date === "2026-04-06" && p.period === 1)).toBeUndefined();
+    expect(plan.find((p) => p.date === "2026-04-06" && p.period === 5)).toBeDefined();
+  });
+
+  it("cancelled は日付・時限順に並ぶ", () => {
+    const { cancelled } = generateWeeklyPlan(
+      WEEK1_MONDAY,
+      testSetting,
+      testTimetable,
+      [
+        { date: "2026-04-07", period: 1, original_class_code: "4-1",
+          new_class_code: null, change_type: "cancel" as const, memo: "b" },
+        { date: "2026-04-06", period: 2, original_class_code: "4-1",
+          new_class_code: null, change_type: "cancel" as const, memo: "a" },
+      ],
+      [progressG3Start, progressG4Start],
+      testPacks,
+      []
+    );
+    expect(cancelled.map((c) => `${c.date}:${c.period}`)).toEqual([
+      "2026-04-06:2",
+      "2026-04-07:1",
+    ]);
+  });
+});
+
 describe("generateWeeklyPlan - 先頭コマ確定", () => {
   it("firstLessonConfirms で指定された単元・本時から始まる", () => {
     const { plan } = generateWeeklyPlan(

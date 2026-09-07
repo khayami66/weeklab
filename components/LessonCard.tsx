@@ -105,8 +105,10 @@ export default function LessonCard({
       <h3 className={compact ? "mt-1 text-sm font-semibold text-slate-800" : "mt-2 text-base font-semibold text-slate-800"}>
         {lesson.unit_name || "(未設定)"}
         {!isCompleted && (
-          <span className="ml-2 text-xs font-normal text-slate-500">
-            {lesson.lesson_no}/{lesson.total_hours}時間目
+          // 「時間目」は付けない。分数だけで伝わるうえ、
+          // この3文字で折り返して1行増え、週案グリッドが縦に伸びるため
+          <span className="ml-2 text-xs font-normal tabular-nums text-slate-500">
+            {lesson.lesson_no}/{lesson.total_hours}
           </span>
         )}
       </h3>

@@ -26,7 +26,7 @@ export default function AddSlotForm({ classCodes, fixedPeriod, onAdd, onClose }:
   const [memo, setMemo] = useState("");
 
   return (
-    <div className="mt-2 space-y-2 rounded border border-emerald-300 bg-emerald-50 p-2">
+    <div className="space-y-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2">
       <div className="flex gap-2">
         {fixedPeriod === undefined && (
           <label className="block">

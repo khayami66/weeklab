@@ -197,27 +197,31 @@ export default function WeeklyGrid({
                 <div key={cellKey} className="min-w-0">
                   {isEmpty ? (
                     canEdit ? (
-                      <>
+                      /*
+                        開いたらボタンと入れ替える（並べない）。
+                        「＋」は h-full で枠いっぱいに伸びるため、下にフォームを足すと
+                        ボタンが伸びたぶんフォームが画面外へ押し出される。
+                      */
+                      openKey === addKey ? (
+                        <AddSlotForm
+                          classCodes={edit!.classCodes}
+                          fixedPeriod={period}
+                          onAdd={(p, classCode, memo) => {
+                            edit!.onAddSlot(dateKey, p, classCode, memo);
+                            setOpenKey(null);
+                          }}
+                          onClose={() => setOpenKey(null)}
+                        />
+                      ) : (
                         <button
                           type="button"
-                          onClick={() => setOpenKey(openKey === addKey ? null : addKey)}
+                          onClick={() => setOpenKey(addKey)}
                           className="h-full min-h-16 w-full rounded-lg border border-dashed border-slate-200 text-xs text-slate-300 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
                           title={`${dateKey} ${period}限に授業を追加`}
                         >
                           ＋
                         </button>
-                        {openKey === addKey && (
-                          <AddSlotForm
-                            classCodes={edit!.classCodes}
-                            fixedPeriod={period}
-                            onAdd={(p, classCode, memo) => {
-                              edit!.onAddSlot(dateKey, p, classCode, memo);
-                              setOpenKey(null);
-                            }}
-                            onClose={() => setOpenKey(null)}
-                          />
-                        )}
-                      </>
+                      )
                     ) : (
                       <div className="h-full min-h-16 rounded-lg border border-dashed border-slate-100" />
                     )

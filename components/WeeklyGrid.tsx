@@ -12,7 +12,6 @@ import type {
 import AddSlotForm from "./AddSlotForm";
 import FirstLessonPicker from "./FirstLessonPicker";
 import LessonCard from "./LessonCard";
-import SlotActionMenu, { type SlotAction } from "./SlotActionMenu";
 
 const WEEKDAYS: readonly Weekday[] = ["月", "火", "水", "木", "金", "土"];
 
@@ -22,17 +21,15 @@ const PERIODS = [1, 2, 3, 4, 5, 6];
 export type GridEditHandlers = {
   /** 選べるクラスコード（差し替え・追加の候補） */
   classCodes: string[];
-  onCancelSlot: (date: string, period: number, classCode: string, reason: string) => void;
-  onReplaceSlot: (
-    date: string,
-    period: number,
-    from: string,
-    to: string,
-    memo: string
-  ) => void;
+  /**
+   * 個別のコマを休講にする。**理由は聞かない。**
+   * 1コマずつ理由を入力させると、行事の週は5〜6回ダイアログが出て
+   * 週案作成が速くなるどころか遅くなるため（理由は「この日をなくす」でのみ聞く）。
+   */
+  onCancelSlot: (date: string, period: number, classCode: string) => void;
   onAddSlot: (date: string, period: number, classCode: string, memo: string) => void;
   onCancelWholeDay: (date: string, reason: string) => void;
-  /** 変更を取り消して基本時間割に戻す */
+  /** 差分を取り消して基本時間割に戻す（休講の解除・追加の取り消し） */
   onRestore: (date: string, period: number, classCode: string) => void;
 };
 
@@ -231,35 +228,36 @@ export default function WeeklyGrid({
                         const key = `${lesson.date}:${lesson.period}:${lesson.class_code}`;
                         return (
                           <div key={key}>
-                            <LessonCard lesson={lesson} compact />
-                            {canEdit && (
-                              <div className="mt-1 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setOpenKey(openKey === `slot:${key}` ? null : `slot:${key}`)
-                                  }
-                                  className="text-xs text-slate-500 underline hover:text-slate-700"
-                                >
-                                  変更
-                                </button>
-                                {lesson.is_override && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      edit!.onRestore(
-                                        lesson.date,
-                                        lesson.period,
-                                        lesson.class_code
-                                      )
+                            <LessonCard
+                              lesson={lesson}
+                              compact
+                              onRemove={
+                                canEdit
+                                  ? () => {
+                                      // 自分で追加したコマは「休講」にせず追加そのものを取り消す。
+                                      // もともと無かったコマを打ち消し線で残す意味がないため。
+                                      if (lesson.is_override) {
+                                        edit!.onRestore(
+                                          lesson.date,
+                                          lesson.period,
+                                          lesson.class_code
+                                        );
+                                      } else {
+                                        edit!.onCancelSlot(
+                                          lesson.date,
+                                          lesson.period,
+                                          lesson.class_code
+                                        );
+                                      }
                                     }
-                                    className="text-xs text-blue-600 underline hover:text-blue-800"
-                                  >
-                                    戻す
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                                  : undefined
+                              }
+                              removeLabel={
+                                lesson.is_override
+                                  ? "追加したこのコマを取り消す"
+                                  : "この時間を休講にする"
+                              }
+                            />
                             {canPickFirst && firstSlotKey.get(lesson.class_code) === key && (
                               <FirstLessonBlock
                                 lesson={lesson}
@@ -268,32 +266,6 @@ export default function WeeklyGrid({
                                 onToggle={() =>
                                   setOpenKey(openKey === `first:${key}` ? null : `first:${key}`)
                                 }
-                                onClose={() => setOpenKey(null)}
-                              />
-                            )}
-                            {canEdit && openKey === `slot:${key}` && (
-                              <SlotActionMenu
-                                classCode={lesson.class_code}
-                                classCodes={edit!.classCodes}
-                                onApply={(action: SlotAction) => {
-                                  if (action.type === "cancel") {
-                                    edit!.onCancelSlot(
-                                      lesson.date,
-                                      lesson.period,
-                                      lesson.class_code,
-                                      action.reason
-                                    );
-                                  } else {
-                                    edit!.onReplaceSlot(
-                                      lesson.date,
-                                      lesson.period,
-                                      lesson.class_code,
-                                      action.toClassCode,
-                                      action.memo
-                                    );
-                                  }
-                                  setOpenKey(null);
-                                }}
                                 onClose={() => setOpenKey(null)}
                               />
                             )}
@@ -308,24 +280,32 @@ export default function WeeklyGrid({
                           className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-400 line-through">
-                              {c.class_code}
-                            </span>
+                            {/*
+                              授業カードの「×」と同じ位置に置く。
+                              同じ場所を押せば「消す ⇄ 戻す」が行き来できる。
+                            */}
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => edit!.onRestore(c.date, c.period, c.class_code)}
+                                aria-label="休講を取り消して元に戻す"
+                                title="休講を取り消して元に戻す"
+                                className="-ml-1 -mt-1 rounded px-1.5 text-sm leading-none text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                              >
+                                ↩
+                              </button>
+                            ) : (
+                              <span />
+                            )}
                             <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-600">
                               休講
                             </span>
                           </div>
+                          <p className="mt-1 text-sm text-slate-400 line-through">
+                            {c.class_code}
+                          </p>
                           {c.reason && (
-                            <p className="mt-1 text-xs text-slate-500">{c.reason}</p>
-                          )}
-                          {canEdit && (
-                            <button
-                              type="button"
-                              onClick={() => edit!.onRestore(c.date, c.period, c.class_code)}
-                              className="mt-1 text-xs text-blue-600 underline hover:text-blue-800"
-                            >
-                              戻す
-                            </button>
+                            <p className="mt-0.5 text-xs text-slate-500">{c.reason}</p>
                           )}
                         </div>
                       ))}

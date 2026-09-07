@@ -22,7 +22,6 @@ import {
   clearWeekOverrides,
   overridesInWeek,
   removeOverride,
-  replaceSlot,
 } from "@/lib/overrideEdit";
 import { advanceProgress } from "@/lib/progress";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
@@ -184,13 +183,11 @@ function WeeklyPageContent() {
 
   const editHandlers = {
     classCodes,
-    onCancelSlot: (date: string, period: number, code: string, reason: string) =>
-      applyOverrides(cancelSlot(overrides, date, period, code, reason), "休講にしました"),
-    onReplaceSlot: (date: string, period: number, from: string, to: string, memo: string) =>
-      applyOverrides(
-        replaceSlot(overrides, date, period, from, to, memo),
-        `${from} を ${to} に変更しました`
-      ),
+    // 個別のコマは理由を聞かず即休講にする。
+    // 1コマずつ入力させると行事の週で何度もダイアログが出て、週案作成が遅くなるため。
+    // 理由は「この日をなくす」（1日まるごと）でのみ入力する。
+    onCancelSlot: (date: string, period: number, code: string) =>
+      applyOverrides(cancelSlot(overrides, date, period, code, ""), "休講にしました"),
     onAddSlot: (date: string, period: number, code: string, memo: string) =>
       applyOverrides(addSlot(overrides, date, period, code, memo), "授業を追加しました"),
     onCancelWholeDay: (date: string, reason: string) => {
@@ -391,9 +388,12 @@ function WeeklyPageContent() {
             firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
           />
           <p className="mt-2 text-xs text-slate-500">
-            枠は月〜土 × 1〜6限で固定です。<strong>空きコマの「＋」から授業を追加</strong>でき、
-            各コマの「変更」で休講・クラス変更、日付の下の「この日をなくす」で祝日・行事に対応します。
+            枠は月〜土 × 1〜6限で固定です。<strong>空きコマの「＋」から授業を追加</strong>、
+            <strong>コマ左上の「×」でその時間をなくす</strong>（自分で追加したコマは取り消し、
+            いつもの授業は休講）。祝日・行事で1日まるごと動くときは、日付の下の
+            「この日をなくす」で理由をつけて消せます。
             <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
+            休講カードの「↩」で元に戻せます。
             <br />
             各クラスの<strong>最初のコマ</strong>には「単元・本時」が付いています。
             前週が予定どおり進まなかったときは、そこで本時を戻してください。

@@ -107,7 +107,15 @@ export function addSlot(
   );
 }
 
-/** そのコマのクラスを差し替える */
+/**
+ * そのコマのクラスを差し替える。
+ *
+ * **2026-09-07 時点、画面からは呼ばれていない。**
+ * カードを「×」だけの構成にしたため入口を廃止した（同じ枠で「×」→「＋」で
+ * 別クラスを入れれば同じ結果になる）。
+ * ただし `buildWeekSlots` は `replace` 型の差分を今も処理するので、
+ * 過去に作られたデータは正しく表示される。関数もテストごと残しておく。
+ */
 export function replaceSlot(
   overrides: TimetableOverride[],
   date: string,

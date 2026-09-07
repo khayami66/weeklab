@@ -8,6 +8,8 @@ import { useClassProgress } from "@/hooks/useClassProgress";
 import { useFirstLessonConfirms } from "@/hooks/useFirstLessonConfirms";
 import { useOverrides } from "@/hooks/useOverrides";
 import { useSetting } from "@/hooks/useSetting";
+import { useSlotPlans } from "@/hooks/useSlotPlans";
+import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTimetable } from "@/hooks/useTimetable";
 import { formatDate, getMondayOf, getWeekDates, getWeekNumber } from "@/lib/date";
 import { localDataSource } from "@/lib/datasource/localDataSource";
@@ -27,6 +29,8 @@ export default function HomePage() {
   const { setting, loading: settingLoading } = useSetting();
   const { timetable, loading: ttLoading } = useTimetable();
   const { overrides, loading: ovLoading } = useOverrides();
+  const { slotPlans, loading: spLoading } = useSlotPlans();
+  const { testMasters, loading: tmLoading } = useTestMasters();
   const { progress, loading: progLoading } = useClassProgress();
 
   const today = useMemo(() => new Date(), []);
@@ -62,7 +66,14 @@ export default function HomePage() {
   }, [setting]);
 
   const loading =
-    settingLoading || ttLoading || ovLoading || progLoading || confLoading || packsLoading;
+    settingLoading ||
+    ttLoading ||
+    ovLoading ||
+    spLoading ||
+    tmLoading ||
+    progLoading ||
+    confLoading ||
+    packsLoading;
 
   if (loading || !setting) {
     return (
@@ -92,7 +103,9 @@ export default function HomePage() {
     overrides,
     progress,
     packs,
-    confirms
+    confirms,
+    slotPlans,
+    testMasters
   );
 
   const weekDates = getWeekDates(monday);

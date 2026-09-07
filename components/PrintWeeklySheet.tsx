@@ -155,18 +155,29 @@ export default function PrintWeeklySheet({
                       {lessons.map((l) => {
                         // 授業案が未記入のコマは「(未作成)」を紙に刷らない。
                         // 画面は促すために出すが、提出物にその文字は要らない
+                        // 「(未作成)」は紙に刷らない。単元名と同じ本時名も繰り返さない
                         const title =
-                          l.lesson_title && l.lesson_title !== "(未作成)"
+                          l.lesson_title &&
+                          l.lesson_title !== "(未作成)" &&
+                          l.lesson_title !== l.unit_name
                             ? l.lesson_title
                             : "";
+                        const isTest = l.kind === "test";
                         return (
                           <div key={l.class_code} className="mb-1">
                             <div className="flex items-baseline justify-between gap-1">
                               <span className="text-[11px] font-bold">{l.class_code}</span>
-                              {l.lesson_no > 0 && (
-                                <span className="shrink-0 text-[9px] tabular-nums text-slate-600">
-                                  {l.lesson_no}/{l.total_hours}
+                              {isTest ? (
+                                // テストは単元の何時間目でもないので分数を出さない
+                                <span className="shrink-0 rounded bg-slate-200 px-1 text-[8px] font-bold text-slate-700">
+                                  テスト
                                 </span>
+                              ) : (
+                                l.lesson_no > 0 && (
+                                  <span className="shrink-0 text-[9px] tabular-nums text-slate-600">
+                                    {l.lesson_no}/{l.total_hours}
+                                  </span>
+                                )
                               )}
                             </div>
                             {/* 単元名は折り返して2行まで。長い単元名を切り落とさない */}

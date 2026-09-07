@@ -4,7 +4,9 @@ import type {
   ClassProgress,
   FirstLessonConfirm,
   LessonMaster,
+  SlotPlanOverride,
   TeacherSetting,
+  TestMaster,
   Timetable,
   TimetableOverride,
   Weekday,
@@ -13,6 +15,7 @@ import type {
 } from "@/types";
 import { formatDate, getMondayOf, getWeekDates, getWeekNumber } from "./date";
 import { advanceUnitIfCompleted } from "./progress";
+import { findSlotPlan } from "./slotPlanEdit";
 
 /** JS の Date#getDay() (0=日〜6=土) を Weeklab の Weekday に変換 */
 function dayIndexToWeekday(dayIndex: number): Weekday | null {
@@ -159,6 +162,63 @@ interface VirtualState {
 }
 
 /**
+ * 中身を差し替えたコマを1件つくる。
+ *
+ * テストは `lesson_no` を 0 にする（単元の何時間目でもないため）。
+ * 画面・紙は `kind` を見て判別するので、`lesson_no === 0` を
+ * 「年間計画完了」と誤読しないこと。
+ */
+function buildOverriddenLesson(
+  slot: Slot,
+  slotPlan: SlotPlanOverride,
+  pack: PackBundle,
+  testMasters: TestMaster[],
+  currentUnitName: string
+): WeeklyPlan {
+  const base = {
+    date: slot.date,
+    weekday: slot.weekday,
+    period: slot.period,
+    class_code: slot.class_code,
+    grade: slot.grade,
+    memo: slotPlan.memo,
+    is_override: slot.is_override,
+    override_memo: slot.override_memo,
+    is_plan_override: true,
+  };
+
+  if (slotPlan.kind === "test") {
+    const test = testMasters.find((t) => t.test_id === slotPlan.test_id);
+    return {
+      ...base,
+      // テストが単元に紐づいていればその単元、無ければ今やっている単元を文脈として出す
+      unit_name: test && test.unit_name !== "" ? test.unit_name : currentUnitName,
+      lesson_no: 0,
+      total_hours: 0,
+      lesson_title: test ? test.test_name : "テスト",
+      content: "",
+      kind: "test",
+      test_id: slotPlan.test_id,
+    };
+  }
+
+  const unitPlan = pack.annualPlan.find((u) => u.unit_name === slotPlan.unit_name);
+  const lesson = pack.lessonMaster.find(
+    (l) => l.unit_name === slotPlan.unit_name && l.lesson_no === slotPlan.lesson_no
+  );
+  return {
+    ...base,
+    unit_name: slotPlan.unit_name,
+    lesson_no: slotPlan.lesson_no,
+    total_hours: unitPlan?.allocated_hours ?? 0,
+    lesson_title: lesson && lesson.lesson_title !== "" ? lesson.lesson_title : "(未作成)",
+    content: lesson?.content ?? "",
+    kind: "lesson",
+    test_id: "",
+  };
+}
+
+/**
  * 週案を生成する（純粋関数）。
  * 各クラスごとに週内の仮進度を回し、先頭コマは firstLessonConfirms を優先、
  * 2コマ目以降は LessonMaster 順に自動で割り当てる。
@@ -172,7 +232,11 @@ export function generateWeeklyPlan(
   overrides: TimetableOverride[],
   progress: ClassProgress[],
   packs: Record<string, PackBundle>,
-  firstLessonConfirms: FirstLessonConfirm[] = []
+  firstLessonConfirms: FirstLessonConfirm[] = [],
+  /** コマの中身の差し替え（テスト・別単元の差し込み） */
+  slotPlans: SlotPlanOverride[] = [],
+  /** テスト名を出すため。差し替えが無ければ使わない */
+  testMasters: TestMaster[] = []
 ): { plan: WeeklyPlan[]; summary: WeekSummary; cancelled: CancelledSlot[] } {
   const { slots, cancelled } = buildWeekSlots(weekStart, timetable, overrides);
 
@@ -216,6 +280,17 @@ export function generateWeeklyPlan(
     const pack = packs[vs.pack_id];
     if (!pack) continue;
 
+    // ── 中身を自分で決めているコマ（テスト・差し込み）──
+    // **単元の進度は動かさない。**授業時間としては実施しているので累計だけ進める。
+    // ここで continue するので、下の自動計算は走らない。
+    const slotPlan = findSlotPlan(slotPlans, slot.date, slot.period, slot.class_code);
+    if (slotPlan) {
+      plan.push(buildOverriddenLesson(slot, slotPlan, pack, testMasters, vs.unit_name));
+      vs.total_completed_hours += 1;
+      tallyByClass[slot.class_code] = (tallyByClass[slot.class_code] ?? 0) + 1;
+      continue;
+    }
+
     const isFirstForClass = !seenFirst.has(slot.class_code);
     if (isFirstForClass) seenFirst.add(slot.class_code);
 
@@ -250,6 +325,9 @@ export function generateWeeklyPlan(
         memo: "",
         is_override: slot.is_override,
         override_memo: slot.override_memo,
+        kind: "lesson",
+        test_id: "",
+        is_plan_override: false,
       });
       vs.total_completed_hours += 1;
       tallyByClass[slot.class_code] = (tallyByClass[slot.class_code] ?? 0) + 1;
@@ -279,6 +357,9 @@ export function generateWeeklyPlan(
       memo: "",
       is_override: slot.is_override,
       override_memo: slot.override_memo,
+      kind: "lesson",
+      test_id: "",
+      is_plan_override: false,
     });
 
     // 仮進度を進める

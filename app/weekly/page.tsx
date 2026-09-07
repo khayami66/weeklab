@@ -12,6 +12,8 @@ import { useClassProgress } from "@/hooks/useClassProgress";
 import { useFirstLessonConfirms } from "@/hooks/useFirstLessonConfirms";
 import { useOverrides } from "@/hooks/useOverrides";
 import { useSetting } from "@/hooks/useSetting";
+import { useSlotPlans } from "@/hooks/useSlotPlans";
+import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTimetable } from "@/hooks/useTimetable";
 import { formatDate, getMondayOf, getWeekDates, parseISODate } from "@/lib/date";
 import { localDataSource } from "@/lib/datasource/localDataSource";
@@ -23,14 +25,17 @@ import {
   overridesInWeek,
   removeOverride,
 } from "@/lib/overrideEdit";
-import { advanceProgress } from "@/lib/progress";
+import { advanceProgress, advanceTotalOnly } from "@/lib/progress";
+import { clearSlotPlan, setSlotPlan } from "@/lib/slotPlanEdit";
 import { computeMonthlyHoursByClass } from "@/lib/summary";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
+import type { SlotPlanChoice } from "@/components/SlotPlanPicker";
 import type {
   AnnualPlan,
   ClassProgress,
   FirstLessonConfirm,
   LessonMaster,
+  SlotPlanOverride,
   TeacherSetting,
 } from "@/types";
 import { getActivePacks } from "@/types";
@@ -90,6 +95,8 @@ function WeeklyPageContent() {
   const { setting, loading: settingLoading } = useSetting();
   const { timetable, loading: ttLoading } = useTimetable();
   const { overrides, loading: ovLoading, save: saveOverrides } = useOverrides();
+  const { slotPlans, loading: spLoading, save: saveSlotPlans } = useSlotPlans();
+  const { testMasters, loading: tmLoading } = useTestMasters();
   const { progress, loading: progLoading, save: saveProgress } = useClassProgress();
   const { confirms, loading: confLoading, save: saveConfirms } = useFirstLessonConfirms(mondayKey);
 
@@ -139,7 +146,14 @@ function WeeklyPageContent() {
   const [saving, setSaving] = useState(false);
 
   const loading =
-    settingLoading || ttLoading || ovLoading || progLoading || confLoading || packsLoading;
+    settingLoading ||
+    ttLoading ||
+    ovLoading ||
+    spLoading ||
+    tmLoading ||
+    progLoading ||
+    confLoading ||
+    packsLoading;
 
   if (loading || !setting) {
     return (
@@ -160,7 +174,9 @@ function WeeklyPageContent() {
     overrides,
     progress,
     packs,
-    confirms
+    confirms,
+    slotPlans,
+    testMasters
   );
 
   const hasTimetable = timetable.length > 0;
@@ -245,6 +261,59 @@ function WeeklyPageContent() {
     onChange: handleFirstLessonChange,
   };
 
+  /**
+   * コマの中身を差し替える（テスト・別単元の差し込み）。
+   * `next === null` なら差し替えを消して進度からの自動計算に戻す。
+   */
+  const handleSlotPlanChange = async (
+    date: string,
+    period: number,
+    classCode: string,
+    next: SlotPlanChoice | null
+  ) => {
+    let updated: SlotPlanOverride[];
+    let message: string;
+    if (next === null) {
+      updated = clearSlotPlan(slotPlans, date, period, classCode);
+      message = `${classCode} を自動に戻しました`;
+    } else {
+      const base = { date, period, class_code: classCode, memo: "" };
+      const record: SlotPlanOverride =
+        next.kind === "test"
+          ? { ...base, kind: "test", test_id: next.test_id, unit_name: "", lesson_no: 0 }
+          : {
+              ...base,
+              kind: "lesson",
+              test_id: "",
+              unit_name: next.unit_name,
+              lesson_no: next.lesson_no,
+            };
+      updated = setSlotPlan(slotPlans, record);
+      message = next.kind === "test" ? "テストにしました" : "単元を指定しました";
+    }
+    try {
+      await saveSlotPlans(updated);
+      setToastKind("success");
+      setToast(message);
+    } catch (err) {
+      setToastKind("error");
+      setToast(`保存に失敗しました: ${String(err)}`);
+    }
+  };
+
+  const testMastersByPack: Record<string, typeof testMasters> = {};
+  for (const t of testMasters) {
+    testMastersByPack[t.pack_id] = [...(testMastersByPack[t.pack_id] ?? []), t];
+  }
+
+  const slotPlanHandlers = {
+    annualPlanByPack: firstLessonHandlers.annualPlanByPack,
+    packIdByClass: firstLessonHandlers.packIdByClass,
+    testMastersByPack,
+    slotPlans,
+    onChange: handleSlotPlanChange,
+  };
+
   // 「今週を実施済みに確定」
   const handleConfirmWeek = async () => {
     if (isConfirmedWeek) return;
@@ -260,17 +329,21 @@ function WeeklyPageContent() {
 
     setSaving(true);
     try {
-      // 各クラスの週内コマ数を集計
-      const countByClass: Record<string, number> = {};
+      // 各クラスの週内コマ数を、**種別ごとに**集計する。
+      // テストと差し込みは単元の時数を使わないので、累計だけ進める。
+      // ここを分けないと「とじこめた空気や水 6時間」の授業が5時間になる。
+      const lessonCount: Record<string, number> = {};
+      const overriddenCount: Record<string, number> = {};
       for (const p of plan) {
-        countByClass[p.class_code] = (countByClass[p.class_code] ?? 0) + 1;
+        const bucket = p.is_plan_override ? overriddenCount : lessonCount;
+        bucket[p.class_code] = (bucket[p.class_code] ?? 0) + 1;
       }
 
       // 各クラスの進度を「コマ数」回 advanceProgress
       const updated: ClassProgress[] = progress.map((p) => {
         const pack = packs[p.pack_id];
         if (!pack) return p;
-        const n = countByClass[p.class_code] ?? 0;
+        const n = lessonCount[p.class_code] ?? 0;
         // 先頭コマ確定がある場合、その位置から再スタートするよう合わせる
         const confirm = confirms.find((c) => c.class_code === p.class_code);
         let current: ClassProgress = p;
@@ -283,6 +356,10 @@ function WeeklyPageContent() {
         }
         for (let i = 0; i < n; i++) {
           current = advanceProgress(current, pack.annualPlan);
+        }
+        const extra = overriddenCount[p.class_code] ?? 0;
+        for (let i = 0; i < extra; i++) {
+          current = advanceTotalOnly(current);
         }
         return current;
       });
@@ -398,6 +475,7 @@ function WeeklyPageContent() {
             cancelled={cancelled}
             edit={isConfirmedWeek ? undefined : editHandlers}
             firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
+            slotPlan={isConfirmedWeek ? undefined : slotPlanHandlers}
           />
           <p className="mt-2 text-xs text-slate-500">
             枠は月〜土 × 1〜6限で固定です。<strong>空きコマの「＋」から授業を追加</strong>、
@@ -407,8 +485,13 @@ function WeeklyPageContent() {
             <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
             休講カードの「↩」で元に戻せます。
             <br />
-            各クラスの<strong>その週最初のコマは青いボックス</strong>です。
-            <strong>押すと単元・本時を選べます</strong>（前週が予定どおり進まなかったときは、そこで本時を戻してください）。
+            <strong>どのコマも押すと中身を変えられます</strong>（テストにする／単元を指定する）。
+            差し替えたコマは<strong>単元の時数を使わない</strong>ので、次のコマは自動でもとの単元の続きに戻ります。
+            差し替えたコマは<strong>黄色いボックス</strong>です。
+            <br />
+            各クラスの<strong>その週最初のコマは青いボックス</strong>で、
+            押すと<strong>そのクラスの現在地</strong>（単元・本時）も直せます。
+            こちらは<strong>以降ずっと影響する</strong>ので、テストを入れるだけなら触らないでください。
           </p>
         </section>
       )}

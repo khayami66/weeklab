@@ -99,6 +99,21 @@ export function advanceProgress(
 }
 
 /**
+ * **単元の進度は動かさず、年間の実施累計だけ +1 する。**
+ *
+ * テストのコマと、単元途中に差し込んだコマで使う。
+ * その時間は授業として実施しているので実施累計（＝管理職に出す時数）には数えるが、
+ * 単元の残り時間を消費させてはいけない。消費させると
+ * 「とじこめた空気や水 6時間」の授業が5時間になってしまう。
+ */
+export function advanceTotalOnly(progress: ClassProgress): ClassProgress {
+  return {
+    ...progress,
+    total_completed_hours: progress.total_completed_hours + 1,
+  };
+}
+
+/**
  * 現単元の completed_hours が allocated_hours を超えている場合、
  * 年間計画順で次の単元に繰り上げた状態を返す。
  * 年間計画を完遂していれば null を返す。

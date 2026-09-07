@@ -167,6 +167,37 @@ export interface FirstLessonConfirm {
   lesson_no: number; // 本時（1始まり）
 }
 
+/**
+ * そのコマで何をするか（既定は進度からの自動計算＝レコードなし）。
+ *
+ * `TimetableOverride` とは**軸が違う**ので混ぜない。
+ *   `TimetableOverride` … コマの**有無**を変える（休講・追加・クラス変更）
+ *   `SlotPlanOverride`  … コマの**中身**を変える（テスト・別単元の差し込み）
+ *
+ * **差し替えたコマは単元の残り時間を消費しない。**
+ * 「とじこめた空気や水 6時間」の5コマ目をテストにしたとき、それを5時間目として
+ * 数えると授業が1時間足りなくなるため。ただし授業時間としては実施しているので、
+ * 週実施・月実施・実施累計には数える（`total_completed_hours` だけ +1）。
+ *
+ * 既知の限界：差し込みを何時間積んでも、その単元は「未実施」のまま残る。
+ * 単元を丸ごと前倒しする用途には足りない（`slot-plan-override-plan.md` §9）。
+ */
+export type SlotPlanKind = "test" | "lesson";
+
+export interface SlotPlanOverride {
+  date: string; // "YYYY-MM-DD"
+  period: number;
+  class_code: string;
+  kind: SlotPlanKind;
+  /** kind="test" のとき。`TestMaster.test_id`。未選択なら "" */
+  test_id: string;
+  /** kind="lesson" のとき。差し込む単元名 */
+  unit_name: string;
+  /** kind="lesson" のとき。差し込む本時（1始まり） */
+  lesson_no: number;
+  memo: string;
+}
+
 // ============================================================
 // 3. 派生・運用データ
 // ============================================================
@@ -185,6 +216,12 @@ export interface WeeklyPlan {
   memo: string;
   is_override: boolean;
   override_memo: string;
+  /** そのコマの種別。既定は通常授業 */
+  kind: SlotPlanKind;
+  /** kind="test" のとき選んだテスト。未選択なら "" */
+  test_id: string;
+  /** 自分で中身を決めたコマか（画面と紙で印を出す） */
+  is_plan_override: boolean;
 }
 
 /**
@@ -376,6 +413,7 @@ export interface FullSnapshot {
       confirmed_weeks?: string[];
       /** ユーザーが編集した授業案。パック層の LessonMaster を上書きする */
       lesson_plans?: LessonPlan[];
+      slot_plans?: SlotPlanOverride[];
       // ── 成績層（v1.6 追加）──
       // 既存のエクスポートJSONには存在しないため optional。
       // インポート側は欠けていても壊れないこと。

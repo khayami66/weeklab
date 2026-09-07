@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateWeeklyPlan, getLessonsForDate } from "./weeklyPlan";
+import type { SlotPlanOverride, TestMaster } from "@/types";
 import {
   progressG3Start,
   progressG4Start,
@@ -313,5 +314,150 @@ describe("getLessonsForDate", () => {
     );
     expect(lessons).toHaveLength(2);
     expect(lessons.every((l) => l.date === "2026-04-06")).toBe(true);
+  });
+});
+
+describe("generateWeeklyPlan - コマの中身の差し替え（テスト・差し込み）", () => {
+  const gen = (slotPlans: SlotPlanOverride[], masters: TestMaster[] = []) =>
+    generateWeeklyPlan(
+      WEEK1_MONDAY,
+      testSetting,
+      testTimetable,
+      [],
+      [progressG3Start, progressG4Start],
+      testPacks,
+      [],
+      slotPlans,
+      masters
+    );
+
+  const masters: TestMaster[] = [
+    {
+      test_id: "t.A",
+      pack_id: "test.grade3",
+      unit_name: "A",
+      test_name: "単元Aテスト",
+      max_knowledge: 70,
+      max_thinking: 30,
+      note: "",
+    },
+  ];
+
+  /** 3-1 の3コマ目は 水(4/8) 1限 */
+  const WED = "2026-04-08";
+
+  it("テストにしたコマは単元の時数を消費しない（次のコマが続きから始まる）", () => {
+    const { plan } = gen([
+      {
+        date: WED,
+        period: 1,
+        class_code: "3-1",
+        kind: "test",
+        test_id: "t.A",
+        unit_name: "",
+        lesson_no: 0,
+        memo: "",
+      },
+    ], masters);
+
+    const g3 = plan.filter((p) => p.class_code === "3-1");
+    expect(g3).toHaveLength(5);
+    expect(g3[0]).toMatchObject({ unit_name: "A", lesson_no: 1 });
+    expect(g3[1]).toMatchObject({ unit_name: "A", lesson_no: 2 });
+    // 3コマ目はテスト。単元の何時間目でもない
+    expect(g3[2]).toMatchObject({ kind: "test", lesson_no: 0, is_plan_override: true });
+    // **差し替えが無かった場合と同じ位置から続く**（B1 が飛ばされない）
+    expect(g3[3]).toMatchObject({ unit_name: "B", lesson_no: 1 });
+    expect(g3[4]).toMatchObject({ unit_name: "B", lesson_no: 2 });
+  });
+
+  it("テスト名はテストマスタから引く。未選択なら「テスト」とだけ出す", () => {
+    const base = {
+      date: WED,
+      period: 1,
+      class_code: "3-1",
+      kind: "test" as const,
+      unit_name: "",
+      lesson_no: 0,
+      memo: "",
+    };
+    const named = gen([{ ...base, test_id: "t.A" }], masters);
+    expect(named.plan.filter((p) => p.class_code === "3-1")[2]).toMatchObject({
+      lesson_title: "単元Aテスト",
+      unit_name: "A",
+    });
+
+    const unnamed = gen([{ ...base, test_id: "" }], masters);
+    expect(unnamed.plan.filter((p) => p.class_code === "3-1")[2]).toMatchObject({
+      lesson_title: "テスト",
+      test_id: "",
+    });
+  });
+
+  it("テストのコマも週実施時数には数える（授業時間としては実施しているため）", () => {
+    const { summary } = gen([
+      {
+        date: WED,
+        period: 1,
+        class_code: "3-1",
+        kind: "test",
+        test_id: "t.A",
+        unit_name: "",
+        lesson_no: 0,
+        memo: "",
+      },
+    ], masters);
+    const tally = summary.class_tallies.find((t) => t.class_code === "3-1");
+    expect(tally?.weekly_hours).toBe(5);
+  });
+
+  it("別単元を差し込んでも、もとの単元の進度は動かない", () => {
+    const { plan } = gen([
+      {
+        date: WED,
+        period: 1,
+        class_code: "3-1",
+        kind: "lesson",
+        test_id: "",
+        unit_name: "B",
+        lesson_no: 3,
+        memo: "",
+      },
+    ], masters);
+
+    const g3 = plan.filter((p) => p.class_code === "3-1");
+    // 差し込んだコマは指定どおり B の3時間目
+    expect(g3[2]).toMatchObject({
+      unit_name: "B",
+      lesson_no: 3,
+      kind: "lesson",
+      is_plan_override: true,
+    });
+    // **差し込みは進度を進めないので、次は本来の B1 から**
+    expect(g3[3]).toMatchObject({ unit_name: "B", lesson_no: 1 });
+    expect(g3[4]).toMatchObject({ unit_name: "B", lesson_no: 2 });
+  });
+
+  it("差し替えていないコマは is_plan_override=false（確定時に単元を進める側）", () => {
+    const { plan } = gen([], masters);
+    expect(plan.every((p) => p.is_plan_override === false)).toBe(true);
+    expect(plan.every((p) => p.kind === "lesson")).toBe(true);
+  });
+
+  it("他のクラス・他の日のコマには影響しない", () => {
+    const { plan } = gen([
+      {
+        date: WED,
+        period: 1,
+        class_code: "3-1",
+        kind: "test",
+        test_id: "t.A",
+        unit_name: "",
+        lesson_no: 0,
+        memo: "",
+      },
+    ], masters);
+    const g4 = plan.filter((p) => p.class_code === "4-1");
+    expect(g4.every((p) => p.is_plan_override === false)).toBe(true);
   });
 });

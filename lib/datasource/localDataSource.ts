@@ -13,6 +13,7 @@ import type {
   TestMaster,
   TestResult,
   Timetable,
+  SlotPlanOverride,
   TimetableOverride,
 } from "@/types";
 import type { DataSource } from "./index";
@@ -144,6 +145,16 @@ export const localDataSource: DataSource = {
   async saveOverrides(o: TimetableOverride[]): Promise<void> {
     const year = readCurrentYear();
     setItem(yearKey(year, "overrides"), o);
+  },
+
+  async getSlotPlans(): Promise<SlotPlanOverride[]> {
+    const year = readCurrentYear();
+    return getItem<SlotPlanOverride[]>(yearKey(year, "slot_plan"), []);
+  },
+
+  async saveSlotPlans(plans: SlotPlanOverride[]): Promise<void> {
+    const year = readCurrentYear();
+    setItem(yearKey(year, "slot_plan"), plans);
   },
 
   async getClassProgress(): Promise<ClassProgress[]> {
@@ -359,6 +370,10 @@ export const localDataSource: DataSource = {
       const lessonPlans = getItem<LessonPlan[]>(yearKey(year, "lesson_plan"), []);
       if (lessonPlans.length > 0) snapshot.years[year].lesson_plans = lessonPlans;
 
+      // ── コマ内容の差し替え（テスト・差し込み）──
+      const slotPlans = getItem<SlotPlanOverride[]>(yearKey(year, "slot_plan"), []);
+      if (slotPlans.length > 0) snapshot.years[year].slot_plans = slotPlans;
+
       // ── 成績層（G1〜G4）──
       // 型に足しただけで実装を忘れると、復元時に成績だけ消える。
       // exportImport.test.ts の往復テストで機械的に検出する。
@@ -416,6 +431,8 @@ export const localDataSource: DataSource = {
       if (data.confirmed_weeks) setItem(confirmedWeeksKey(year), data.confirmed_weeks);
 
       if (data.lesson_plans) setItem(yearKey(year, "lesson_plan"), data.lesson_plans);
+
+      if (data.slot_plans) setItem(yearKey(year, "slot_plan"), data.slot_plans);
 
       if (data.test_masters) setItem(yearKey(year, "test_master"), data.test_masters);
       if (data.grade_thresholds) setItem(yearKey(year, "grade_thresholds"), data.grade_thresholds);

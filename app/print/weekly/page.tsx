@@ -8,6 +8,8 @@ import { useClassProgress } from "@/hooks/useClassProgress";
 import { useFirstLessonConfirms } from "@/hooks/useFirstLessonConfirms";
 import { useOverrides } from "@/hooks/useOverrides";
 import { useSetting } from "@/hooks/useSetting";
+import { useSlotPlans } from "@/hooks/useSlotPlans";
+import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTimetable } from "@/hooks/useTimetable";
 import { formatDate, getMondayOf, getWeekDates, getWeekNumber, parseISODate } from "@/lib/date";
 import { localDataSource } from "@/lib/datasource/localDataSource";
@@ -47,6 +49,8 @@ function PrintWeeklyContent() {
   const { setting, loading: settingLoading } = useSetting();
   const { timetable, loading: ttLoading } = useTimetable();
   const { overrides, loading: ovLoading } = useOverrides();
+  const { slotPlans, loading: spLoading } = useSlotPlans();
+  const { testMasters, loading: tmLoading } = useTestMasters();
   const { progress, loading: progLoading } = useClassProgress();
   const { confirms, loading: confLoading } = useFirstLessonConfirms(mondayKey);
 
@@ -79,7 +83,14 @@ function PrintWeeklyContent() {
   }, [setting]);
 
   const loading =
-    settingLoading || ttLoading || ovLoading || progLoading || confLoading || packsLoading;
+    settingLoading ||
+    ttLoading ||
+    ovLoading ||
+    spLoading ||
+    tmLoading ||
+    progLoading ||
+    confLoading ||
+    packsLoading;
 
   if (loading || !setting) {
     return <p className="text-slate-500">読み込み中...</p>;
@@ -95,7 +106,9 @@ function PrintWeeklyContent() {
     overrides,
     progress,
     packs,
-    confirms
+    confirms,
+    slotPlans,
+    testMasters
   );
 
   const monthlyHours = computeMonthlyHoursByClass(

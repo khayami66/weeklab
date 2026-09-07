@@ -6,12 +6,16 @@ import type {
   AnnualPlan,
   CancelledSlot,
   FirstLessonConfirm,
+  SlotPlanOverride,
+  TestMaster,
   Weekday,
   WeeklyPlan,
 } from "@/types";
+import { findSlotPlan } from "@/lib/slotPlanEdit";
 import AddSlotForm from "./AddSlotForm";
 import FirstLessonPicker from "./FirstLessonPicker";
 import LessonCard from "./LessonCard";
+import SlotPlanPicker, { type SlotPlanChoice } from "./SlotPlanPicker";
 
 const WEEKDAYS: readonly Weekday[] = ["月", "火", "水", "木", "金", "土"];
 
@@ -43,6 +47,27 @@ export type FirstLessonHandlers = {
   onChange: (classCode: string, next: FirstLessonConfirm | null) => void;
 };
 
+/**
+ * コマの**中身**を差し替える（テスト・別単元の差し込み）ためのハンドラ。
+ * コマの**有無**を変える `GridEditHandlers` とは別物。
+ */
+export type SlotPlanHandlers = {
+  /** pack_id → 年間指導計画 */
+  annualPlanByPack: Record<string, AnnualPlan[]>;
+  /** pack_id → その学年のテスト */
+  testMastersByPack: Record<string, TestMaster[]>;
+  /** class_code → pack_id */
+  packIdByClass: Record<string, string>;
+  /** いま入っている差し替え（全件でよい。中で該当コマを引く） */
+  slotPlans: SlotPlanOverride[];
+  onChange: (
+    date: string,
+    period: number,
+    classCode: string,
+    next: SlotPlanChoice | null
+  ) => void;
+};
+
 type Props = {
   plan: WeeklyPlan[];
   weekDates: Date[]; // 月〜土の6日
@@ -54,6 +79,8 @@ type Props = {
   edit?: GridEditHandlers;
   /** 各クラスの「週の最初のコマ」で単元・本時を選ばせる。渡さなければ表示しない */
   firstLesson?: FirstLessonHandlers;
+  /** どのコマでも中身を差し替えられるようにする。渡さなければ表示しない */
+  slotPlan?: SlotPlanHandlers;
   /** 閲覧専用モード（アーカイブ表示用） */
   readOnly?: boolean;
 };
@@ -78,13 +105,15 @@ export default function WeeklyGrid({
   cancelled = [],
   edit,
   firstLesson,
+  slotPlan,
   readOnly,
 }: Props) {
-  /** 開いているパネル。`slot:${key}` / `first:${key}` / `add:${date}:${period}` */
+  /** 開いているパネル。`slot:${key}` / `add:${date}:${period}` */
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const canEdit = Boolean(edit) && !readOnly;
   const canPickFirst = Boolean(firstLesson) && !readOnly;
+  const canPickSlotPlan = Boolean(slotPlan) && !readOnly;
 
   /** `${date}:${period}` → その枠の授業 */
   const byCell = new Map<string, WeeklyPlan[]>();
@@ -228,6 +257,8 @@ export default function WeeklyGrid({
                         const key = `${lesson.date}:${lesson.period}:${lesson.class_code}`;
                         const isFirst =
                           canPickFirst && firstSlotKey.get(lesson.class_code) === key;
+                        const panelKey = `slot:${key}`;
+                        const canOpen = canPickFirst || canPickSlotPlan;
                         return (
                           <div key={key}>
                             <LessonCard
@@ -259,26 +290,43 @@ export default function WeeklyGrid({
                                   ? "追加したこのコマを取り消す"
                                   : "この時間を休講にする"
                               }
-                              firstLesson={
-                                isFirst
+                              open={
+                                canOpen
                                   ? {
-                                      confirmed: firstLesson!.confirms.some(
-                                        (c) => c.class_code === lesson.class_code
+                                      isFirst,
+                                      firstConfirmed: Boolean(
+                                        firstLesson?.confirms.some(
+                                          (c) => c.class_code === lesson.class_code
+                                        )
                                       ),
                                       onClick: () =>
-                                        setOpenKey(
-                                          openKey === `first:${key}` ? null : `first:${key}`
-                                        ),
+                                        setOpenKey(openKey === panelKey ? null : panelKey),
                                     }
                                   : undefined
                               }
                             />
-                            {isFirst && openKey === `first:${key}` && (
-                              <FirstLessonBlock
-                                lesson={lesson}
-                                handlers={firstLesson!}
-                                onClose={() => setOpenKey(null)}
-                              />
+                            {openKey === panelKey && (
+                              <>
+                                {/*
+                                  先頭コマだけは2つ出る。意味が違うので並べて置く。
+                                    上 … このクラスは今どこにいるか（以降ずっと影響する）
+                                    下 … このコマだけ別のことをする（進度は動かない）
+                                */}
+                                {isFirst && (
+                                  <FirstLessonBlock
+                                    lesson={lesson}
+                                    handlers={firstLesson!}
+                                    onClose={() => setOpenKey(null)}
+                                  />
+                                )}
+                                {canPickSlotPlan && (
+                                  <SlotPlanBlock
+                                    lesson={lesson}
+                                    handlers={slotPlan!}
+                                    onClose={() => setOpenKey(null)}
+                                  />
+                                )}
+                              </>
                             )}
                           </div>
                         );
@@ -357,6 +405,43 @@ function FirstLessonBlock({
       currentLessonNo={lesson.lesson_no}
       isConfirmed={isConfirmed}
       onChange={(next) => handlers.onChange(lesson.class_code, next)}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * 「このコマで何をするか」のパネル。
+ * 該当コマの差し替えを引いて `SlotPlanPicker` に渡すだけ。
+ */
+function SlotPlanBlock({
+  lesson,
+  handlers,
+  onClose,
+}: {
+  lesson: WeeklyPlan;
+  handlers: SlotPlanHandlers;
+  onClose: () => void;
+}) {
+  const packId = handlers.packIdByClass[lesson.class_code];
+  const current = findSlotPlan(
+    handlers.slotPlans,
+    lesson.date,
+    lesson.period,
+    lesson.class_code
+  );
+
+  return (
+    <SlotPlanPicker
+      classCode={lesson.class_code}
+      annualPlan={handlers.annualPlanByPack[packId] ?? []}
+      testMasters={handlers.testMastersByPack[packId] ?? []}
+      current={current}
+      autoUnitName={lesson.unit_name}
+      autoLessonNo={lesson.lesson_no}
+      onChange={(next) =>
+        handlers.onChange(lesson.date, lesson.period, lesson.class_code, next)
+      }
       onClose={onClose}
     />
   );

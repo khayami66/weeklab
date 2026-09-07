@@ -148,6 +148,30 @@ function seedEverything(): void {
     },
   ]);
 
+  // コマの中身の差し替え（テスト・差し込み）
+  put(yearKey(YEAR, "slot_plan"), [
+    {
+      date: "2026-04-08",
+      period: 1,
+      class_code: "3-1",
+      kind: "test",
+      test_id: TEST_ID,
+      unit_name: "",
+      lesson_no: 0,
+      memo: "",
+    },
+    {
+      date: "2026-04-10",
+      period: 2,
+      class_code: "3-1",
+      kind: "lesson",
+      test_id: "",
+      unit_name: "こん虫のかんさつ",
+      lesson_no: 2,
+      memo: "",
+    },
+  ]);
+
   // 成績層（G1〜G4）
   put(yearKey(YEAR, "test_master"), [
     {

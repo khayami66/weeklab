@@ -440,6 +440,7 @@ function importAll(snapshot: FullSnapshot): Promise<void>;  // 全上書き
 | `TeacherSetting` | `weeklab.{year}.teacher_setting_v1` |
 | `Timetable` | `weeklab.{year}.timetable_v1` |
 | `TimetableOverride` | `weeklab.{year}.overrides_v1` |
+| `SlotPlanOverride` | `weeklab.{year}.slot_plan_v1` |
 | `ClassProgress` | `weeklab.{year}.class_progress_v1` |
 | 週案 `memo` | `weeklab.{year}.memo.{date}.{class_code}.{period}` |
 | 週先頭コマ確定 | `weeklab.{year}.first_lesson.{monday_date}` |

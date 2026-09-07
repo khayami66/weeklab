@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { advanceProgress, advanceUnitIfCompleted, resolveCurrentLesson } from "./progress";
+import {
+  advanceProgress,
+  advanceTotalOnly,
+  advanceUnitIfCompleted,
+  resolveCurrentLesson,
+} from "./progress";
 import {
   g3AnnualPlan,
   g3LessonMaster,
@@ -91,5 +96,31 @@ describe("advanceProgress", () => {
     expect(next.current_unit_name).toBe("B");
     expect(next.completed_hours).toBe(0);
     expect(next.total_completed_hours).toBe(2);
+  });
+});
+
+describe("advanceTotalOnly（テスト・差し込みのコマ）", () => {
+  it("実施累計だけ +1 し、単元の進度は動かさない", () => {
+    const before = { ...progressG3Start, completed_hours: 1, total_completed_hours: 7 };
+    const after = advanceTotalOnly(before);
+    expect(after.total_completed_hours).toBe(8);
+    // ここが動くと「6時間の単元が5時間になる」事故になる
+    expect(after.completed_hours).toBe(1);
+    expect(after.current_unit_name).toBe(before.current_unit_name);
+  });
+
+  it("単元の最終時間まで来ていても、次単元に繰り上げない", () => {
+    // 単元A は2時間。2時間終わった状態でテストを挟んでも A のまま
+    const before = { ...progressG3Start, completed_hours: 2, total_completed_hours: 2 };
+    const after = advanceTotalOnly(before);
+    expect(after.current_unit_name).toBe("A");
+    expect(after.completed_hours).toBe(2);
+    expect(after.total_completed_hours).toBe(3);
+  });
+
+  it("元のオブジェクトを書き換えない", () => {
+    const before = { ...progressG3Start, total_completed_hours: 5 };
+    advanceTotalOnly(before);
+    expect(before.total_completed_hours).toBe(5);
   });
 });

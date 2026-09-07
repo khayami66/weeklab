@@ -17,6 +17,9 @@ function makeLesson(overrides: Partial<WeeklyPlan>): WeeklyPlan {
     memo: "",
     is_override: false,
     override_memo: "",
+    kind: "lesson",
+    test_id: "",
+    is_plan_override: false,
     ...overrides,
   };
 }

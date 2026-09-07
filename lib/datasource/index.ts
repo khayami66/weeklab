@@ -13,6 +13,7 @@ import type {
   TestMaster,
   TestResult,
   Timetable,
+  SlotPlanOverride,
   TimetableOverride,
 } from "@/types";
 
@@ -40,6 +41,13 @@ export interface DataSource {
 
   getOverrides(): Promise<TimetableOverride[]>;
   saveOverrides(o: TimetableOverride[]): Promise<void>;
+
+  /**
+   * コマの**中身**の差し替え（テスト・別単元の差し込み）。
+   * コマの**有無**を変える `getOverrides` とは別物なので混ぜない。
+   */
+  getSlotPlans(): Promise<SlotPlanOverride[]>;
+  saveSlotPlans(plans: SlotPlanOverride[]): Promise<void>;
 
   getClassProgress(): Promise<ClassProgress[]>;
   saveClassProgress(p: ClassProgress[]): Promise<void>;

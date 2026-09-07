@@ -136,6 +136,31 @@ export interface LessonPlan {
   note: string;
 }
 
+/**
+ * 単元に紐づくワークシート（PDF）。
+ *
+ * **保存先は IndexedDB。localStorage には入れない。**
+ * localStorage は約5MB が上限で、PDF を base64 化すると数枚で埋まり、
+ * 設定・進度・成績まで保存できなくなるため（`lib/store/worksheetStore.ts`）。
+ *
+ * ⚠ **JSON バックアップ（`FullSnapshot`）には含まれない。**
+ * 原本は本人の手元にある前提の「授業中にすぐ開ける控え」として置く。
+ */
+export interface Worksheet {
+  id: string;
+  school_year: number;
+  pack_id: string;
+  unit_name: string;
+  file_name: string;
+  size: number; // バイト
+  added_at: string; // ISO datetime
+  note: string;
+  blob: Blob; // PDF 本体
+}
+
+/** 一覧表示用（PDF本体を読まない）。件数や一覧を出すときはこちらを使う */
+export type WorksheetMeta = Omit<Worksheet, "blob">;
+
 export interface FirstLessonConfirm {
   class_code: string;
   unit_name: string;

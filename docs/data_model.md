@@ -280,6 +280,11 @@ interface FullSnapshot {
 }
 ```
 
+> **ワークシート（PDF）は例外的にバックアップの対象外。**
+> `Worksheet` は IndexedDB（`weeklab` / `worksheets`）に置き、`FullSnapshot` に含めない。
+> PDF を base64 で JSON に入れると1回のバックアップが数十MBになり、実用に耐えないため。
+> 原本は本人の手元にある前提の「控え」と位置づけ、画面にその旨を明示している。
+>
 > **永続化キーを増やしたら、必ず `exportAll` / `importAll` の両方に足す。**
 > 型に足しただけで実装を忘れると、「保存はできるがバックアップから復元できない」
 > データが静かに生まれる。実際に成績3種と `confirmed_weeks` で起きた。

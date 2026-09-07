@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import LessonPlanEditor from "@/components/LessonPlanEditor";
 import PageHeader from "@/components/PageHeader";
 import Toast from "@/components/Toast";
+import WorksheetPanel from "@/components/WorksheetPanel";
 import { useLessonPlans } from "@/hooks/useLessonPlans";
 import { useSetting } from "@/hooks/useSetting";
 import { localDataSource } from "@/lib/datasource/localDataSource";
 import { applyPlanRows, buildPlanRows, countFilled } from "@/lib/lessonPlan";
+import { listAllWorksheets } from "@/lib/store/worksheetStore";
 import type { AnnualPlan, CurriculumPack, LessonMaster, LessonPlan } from "@/types";
 import { getActivePacks } from "@/types";
 
@@ -39,6 +41,18 @@ export default function MasterPage() {
   const [rows, setRows] = useState<LessonPlan[]>([]);
   const [baseline, setBaseline] = useState("");
 
+  /** `${pack_id}::${unit_name}` → ワークシート件数。単元ボタンに出す */
+  const [wsCount, setWsCount] = useState<Record<string, number>>({});
+  const reloadWorksheetCount = useCallback(async (year: number) => {
+    const all = await listAllWorksheets(year);
+    const map: Record<string, number> = {};
+    for (const w of all) {
+      const k = `${w.pack_id}::${w.unit_name}`;
+      map[k] = (map[k] ?? 0) + 1;
+    }
+    setWsCount(map);
+  }, []);
+
   const [toast, setToast] = useState<string | null>(null);
   const [toastKind, setToastKind] = useState<"success" | "info" | "error">("success");
   const [saving, setSaving] = useState(false);
@@ -65,12 +79,13 @@ export default function MasterPage() {
       setAnnualPlans(aps);
       setPackMasters(lms);
       setPacksLoading(false);
+      if (setting) void reloadWorksheetCount(setting.school_year);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [activePackIds]);
+  }, [activePackIds, setting, reloadWorksheetCount]);
 
   const loading = settingLoading || plansLoading || packsLoading;
 
@@ -233,6 +248,11 @@ export default function MasterPage() {
                 >
                   {u.month}月・{u.allocated_hours}時間
                   {u.allocated_hours > 0 && `（${filled}/${u.allocated_hours} 記入）`}
+                  {selectedPack && (wsCount[`${selectedPack}::${u.unit_name}`] ?? 0) > 0 && (
+                    <span className="ml-1 text-blue-600">
+                      📄{wsCount[`${selectedPack}::${u.unit_name}`]}
+                    </span>
+                  )}
                 </span>
               </button>
             );
@@ -252,6 +272,28 @@ export default function MasterPage() {
           <section className="space-y-3">
             <h2 className="text-sm font-bold text-slate-700">{selectedUnit}</h2>
             <LessonPlanEditor unitName={selectedUnit} rows={rows} onChange={updateRow} />
+          </section>
+
+          {/*
+            ワークシート（PDF）。授業案とは保存先が別（IndexedDB）なので、
+            下の「保存」ボタンとは無関係にその場で保存される。
+          */}
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-slate-700">ワークシート</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                この単元で使う PDF を貼っておけます。
+                <strong>下の「保存」とは無関係に、その場で保存されます。</strong>
+              </p>
+            </div>
+            <WorksheetPanel
+              // 単元を切り替えたら作り直す（内部の一覧・読み込み状態を持ち越さない）
+              key={`${selectedPack}::${selectedUnit}`}
+              schoolYear={setting!.school_year}
+              packId={selectedPack!}
+              unitName={selectedUnit}
+              onChanged={() => void reloadWorksheetCount(setting!.school_year)}
+            />
           </section>
 
           <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import FirstLessonConfirmRow from "@/components/FirstLessonConfirmRow";
 import PageHeader from "@/components/PageHeader";
 import Toast from "@/components/Toast";
 import WeekPicker from "@/components/WeekPicker";
@@ -133,12 +132,8 @@ function WeeklyPageContent() {
 
   const isConfirmedWeek = confirmedWeeks.includes(mondayKey);
 
-  // 先頭コマ確定の draft（ローカル編集状態）
-  const [confirmsDraft, setConfirmsDraft] = useState<FirstLessonConfirm[] | null>(null);
-  useEffect(() => {
-    if (!confLoading) setConfirmsDraft(structuredClone(confirms));
-  }, [confirms, confLoading, mondayKey]);
-
+  // 先頭コマ確定は draft を持たず**即時保存**する。
+  // 時間割の変更と同じ挙動にそろえ、「保存し忘れ」を作らないため。
   const [toast, setToast] = useState<string | null>(null);
   const [toastKind, setToastKind] = useState<"success" | "info" | "error">("success");
   const [saving, setSaving] = useState(false);
@@ -146,7 +141,7 @@ function WeeklyPageContent() {
   const loading =
     settingLoading || ttLoading || ovLoading || progLoading || confLoading || packsLoading;
 
-  if (loading || !setting || confirmsDraft === null) {
+  if (loading || !setting) {
     return (
       <div>
         <PageHeader title="週案" />
@@ -157,7 +152,7 @@ function WeeklyPageContent() {
 
   const weekDates = getWeekDates(monday);
 
-  // 週案生成（draft の確定値を使う）
+  // 週案生成（保存済みの確定値を使う）
   const { plan, summary, cancelled } = generateWeeklyPlan(
     monday,
     setting,
@@ -165,7 +160,7 @@ function WeeklyPageContent() {
     overrides,
     progress,
     packs,
-    confirmsDraft
+    confirms
   );
 
   const hasTimetable = timetable.length > 0;
@@ -215,32 +210,30 @@ function WeeklyPageContent() {
     await applyOverrides(clearWeekOverrides(overrides, weekDateKeys), "この週の変更を取り消しました");
   };
 
-  // 先頭コマ draft の更新
-  const handleConfirmChange = (classCode: string, next: FirstLessonConfirm | null) => {
-    setConfirmsDraft((prev) => {
-      if (!prev) return prev;
-      const filtered = prev.filter((c) => c.class_code !== classCode);
-      if (next === null) return filtered;
-      return [...filtered, next];
-    });
-  };
-
-  const confirmsDirty =
-    JSON.stringify(confirms.slice().sort(cmpByClass)) !==
-    JSON.stringify(confirmsDraft.slice().sort(cmpByClass));
-
-  const handleSaveConfirms = async () => {
-    setSaving(true);
+  /** 週の最初のコマで単元・本時を選んだとき。null なら推定値に戻す */
+  const handleFirstLessonChange = async (
+    classCode: string,
+    next: FirstLessonConfirm | null
+  ) => {
+    const rest = confirms.filter((c) => c.class_code !== classCode);
+    const updated = next === null ? rest : [...rest, next];
     try {
-      await saveConfirms(confirmsDraft);
+      await saveConfirms(updated.slice().sort(cmpByClass));
       setToastKind("success");
-      setToast("先頭コマを保存しました");
+      setToast(next === null ? `${classCode} を推定値に戻しました` : `${classCode} の開始位置を指定しました`);
     } catch (err) {
       setToastKind("error");
       setToast(`保存に失敗しました: ${String(err)}`);
-    } finally {
-      setSaving(false);
     }
+  };
+
+  const firstLessonHandlers = {
+    annualPlanByPack: Object.fromEntries(
+      Object.entries(packs).map(([id, b]) => [id, b.annualPlan])
+    ),
+    packIdByClass: Object.fromEntries(progress.map((pr) => [pr.class_code, pr.pack_id])),
+    confirms,
+    onChange: handleFirstLessonChange,
   };
 
   // 「今週を実施済みに確定」
@@ -258,11 +251,6 @@ function WeeklyPageContent() {
 
     setSaving(true);
     try {
-      // draft の先頭コマ確定を先に保存
-      if (confirmsDirty) {
-        await saveConfirms(confirmsDraft);
-      }
-
       // 各クラスの週内コマ数を集計
       const countByClass: Record<string, number> = {};
       for (const p of plan) {
@@ -275,7 +263,7 @@ function WeeklyPageContent() {
         if (!pack) return p;
         const n = countByClass[p.class_code] ?? 0;
         // 先頭コマ確定がある場合、その位置から再スタートするよう合わせる
-        const confirm = confirmsDraft.find((c) => c.class_code === p.class_code);
+        const confirm = confirms.find((c) => c.class_code === p.class_code);
         let current: ClassProgress = p;
         if (confirm) {
           current = {
@@ -383,48 +371,6 @@ function WeeklyPageContent() {
         </section>
       )}
 
-      {/* 先頭コマ確定 */}
-      {hasTimetable && progress.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="mb-3 flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-700">週先頭コマの確定</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                各クラスの今週最初のコマを指定します。未確定の場合は ClassProgress からの推定値が使われます。
-                <br />
-                <strong>前週が予定どおり進まなかった場合は、ここで本時を戻せます。</strong>
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSaveConfirms}
-              disabled={!confirmsDirty || saving || isConfirmedWeek}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? "保存中..." : "確定値を保存"}
-            </button>
-          </div>
-          <div className="space-y-2">
-            {progress.map((p) => {
-              const pack = packs[p.pack_id];
-              if (!pack) return null;
-              const confirm = confirmsDraft.find((c) => c.class_code === p.class_code);
-              return (
-                <FirstLessonConfirmRow
-                  key={p.class_code}
-                  classProgress={p}
-                  annualPlan={pack.annualPlan}
-                  lessonMaster={pack.lessonMaster}
-                  confirm={confirm}
-                  onChange={(next) => handleConfirmChange(p.class_code, next)}
-                  disabled={isConfirmedWeek}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
-
       {/* 週案グリッド */}
       {hasTimetable && (
         <section>
@@ -450,11 +396,15 @@ function WeeklyPageContent() {
             weekDates={weekDates}
             cancelled={cancelled}
             edit={isConfirmedWeek ? undefined : editHandlers}
+            firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
           />
           <p className="mt-2 text-xs text-slate-500">
             祝日・行事でコマが動くときは、各コマの「変更」か、日付の下の
             「＋授業を追加」「この日をなくす」を使ってください。
             <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
+            <br />
+            各クラスの<strong>最初のコマ</strong>には「単元・本時」が付いています。
+            前週が予定どおり進まなかったときは、そこで本時を戻してください。
           </p>
         </section>
       )}

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { formatDate } from "@/lib/date";
-import type { CancelledSlot, Weekday, WeeklyPlan } from "@/types";
+import type { AnnualPlan, CancelledSlot, FirstLessonConfirm, Weekday, WeeklyPlan } from "@/types";
 import AddSlotForm from "./AddSlotForm";
+import FirstLessonPicker from "./FirstLessonPicker";
 import LessonCard from "./LessonCard";
 import SlotActionMenu, { type SlotAction } from "./SlotActionMenu";
 
@@ -26,6 +27,16 @@ export type GridEditHandlers = {
   onRestore: (date: string, period: number, classCode: string) => void;
 };
 
+export type FirstLessonHandlers = {
+  /** pack_id → 年間指導計画（単元セレクトの選択肢） */
+  annualPlanByPack: Record<string, AnnualPlan[]>;
+  /** class_code → pack_id */
+  packIdByClass: Record<string, string>;
+  /** その週の確定値（無ければ推定値が使われている） */
+  confirms: FirstLessonConfirm[];
+  onChange: (classCode: string, next: FirstLessonConfirm | null) => void;
+};
+
 type Props = {
   plan: WeeklyPlan[];
   weekDates: Date[]; // 月〜土の6日
@@ -35,6 +46,8 @@ type Props = {
   onMemoChange?: (date: string, period: number, classCode: string, memo: string) => void;
   /** 時間割の変更ハンドラ。渡さなければ編集ボタンを出さない（アーカイブ表示用） */
   edit?: GridEditHandlers;
+  /** 各クラスの「週の最初のコマ」で単元・本時を選ばせる。渡さなければ表示しない */
+  firstLesson?: FirstLessonHandlers;
   /** 閲覧専用モード（アーカイブ表示用） */
   readOnly?: boolean;
 };
@@ -52,6 +65,7 @@ export default function WeeklyGrid({
   weekDates,
   cancelled = [],
   edit,
+  firstLesson,
   readOnly,
 }: Props) {
   /** 開いている操作パネル。`${date}:${period}:${class}` または `add:${date}` */
@@ -75,6 +89,19 @@ export default function WeeklyGrid({
   }
 
   const canEdit = Boolean(edit) && !readOnly;
+  const canPickFirst = Boolean(firstLesson) && !readOnly;
+
+  /**
+   * 各クラスの「その週の最初のコマ」を特定する。
+   * plan は既に日付・時限順なので、クラスごとの初出がそれにあたる。
+   * 休講で月曜が消えれば火曜が最初になる（例外適用後の並びで決まる）。
+   */
+  const firstSlotKey = new Map<string, string>();
+  for (const p of [...plan].sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period)) {
+    if (!firstSlotKey.has(p.class_code)) {
+      firstSlotKey.set(p.class_code, `${p.date}:${p.period}:${p.class_code}`);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -177,6 +204,17 @@ export default function WeeklyGrid({
                           )}
                         </div>
                       )}
+                      {canPickFirst && firstSlotKey.get(lesson.class_code) === key && (
+                        <FirstLessonBlock
+                          lesson={lesson}
+                          handlers={firstLesson!}
+                          open={openKey === `first:${key}`}
+                          onToggle={() =>
+                            setOpenKey(openKey === `first:${key}` ? null : `first:${key}`)
+                          }
+                          onClose={() => setOpenKey(null)}
+                        />
+                      )}
                       {canEdit && openKey === key && (
                         <SlotActionMenu
                           classCode={lesson.class_code}
@@ -240,5 +278,65 @@ export default function WeeklyGrid({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * 「週の最初のコマ」バッジとピッカー。
+ * 確定済みかどうかを一目で分かるようにし、押すと単元・本時を選べる。
+ */
+function FirstLessonBlock({
+  lesson,
+  handlers,
+  open,
+  onToggle,
+  onClose,
+}: {
+  lesson: WeeklyPlan;
+  handlers: FirstLessonHandlers;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  const packId = handlers.packIdByClass[lesson.class_code];
+  const annualPlan = handlers.annualPlanByPack[packId] ?? [];
+  const confirm = handlers.confirms.find((c) => c.class_code === lesson.class_code);
+  const isConfirmed = confirm !== undefined;
+
+  return (
+    <>
+      <div className="mt-1 flex items-center gap-2">
+        <span
+          className={`rounded px-1.5 py-0.5 text-xs ${
+            isConfirmed ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+          }`}
+          title={
+            isConfirmed
+              ? "この週の開始位置を指定済み"
+              : "進度から推定した開始位置。必要なら指定できます"
+          }
+        >
+          {isConfirmed ? "開始 指定済み" : "開始 推定"}
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-xs text-blue-600 underline hover:text-blue-800"
+        >
+          単元・本時
+        </button>
+      </div>
+      {open && (
+        <FirstLessonPicker
+          classCode={lesson.class_code}
+          annualPlan={annualPlan}
+          currentUnitName={lesson.unit_name}
+          currentLessonNo={lesson.lesson_no}
+          isConfirmed={isConfirmed}
+          onChange={(next) => handlers.onChange(lesson.class_code, next)}
+          onClose={onClose}
+        />
+      )}
+    </>
   );
 }

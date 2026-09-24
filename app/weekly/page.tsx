@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import Toast from "@/components/Toast";
 import WeekPicker from "@/components/WeekPicker";
 import WeeklyGrid from "@/components/WeeklyGrid";
+import WeekPlanStrip from "@/components/WeekPlanStrip";
 import WeekSummaryTable from "@/components/WeekSummaryTable";
 import { useClassProgress } from "@/hooks/useClassProgress";
 import { useFirstLessonConfirms } from "@/hooks/useFirstLessonConfirms";
@@ -27,7 +28,7 @@ import {
 } from "@/lib/overrideEdit";
 import { advanceProgress, advanceTotalOnly } from "@/lib/progress";
 import { clearSlotPlan, setSlotPlan } from "@/lib/slotPlanEdit";
-import { computeMonthlyHoursByClass } from "@/lib/summary";
+import { computeMonthlyHoursByClass, computeStandardHoursByClass } from "@/lib/summary";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
 import type { SlotPlanChoice } from "@/components/SlotPlanPicker";
 import type {
@@ -197,6 +198,8 @@ function WeeklyPageContent() {
   const weekDateKeys = weekDates.map((d) => formatDate(d, "YYYY-MM-DD"));
   const weekOverrides = overridesInWeek(overrides, weekDateKeys);
   const classCodes = listClassCodes(setting);
+  // 「いつもの週は何コマか」。基本時間割の件数そのもの（設定項目は増やさない）
+  const standardHours = computeStandardHoursByClass(timetable);
 
   const applyOverrides = async (next: typeof overrides, message: string) => {
     try {
@@ -468,6 +471,17 @@ function WeeklyPageContent() {
                 </button>
               </div>
             )}
+          </div>
+          {/*
+            グリッドの真上に置く。下の時数表は確定した週だけを数えるので、
+            組み立て中の週の過不足はここでしか分からない
+          */}
+          <div className="mb-3">
+            <WeekPlanStrip
+              plan={plan}
+              standardHours={standardHours}
+              classCodes={classCodes}
+            />
           </div>
           <WeeklyGrid
             plan={plan}

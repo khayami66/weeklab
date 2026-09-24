@@ -4,7 +4,6 @@ import { useState } from "react";
 import { formatDate } from "@/lib/date";
 import type {
   AnnualPlan,
-  CancelledSlot,
   FirstLessonConfirm,
   SlotPlanOverride,
   TestMaster,
@@ -26,14 +25,14 @@ export type GridEditHandlers = {
   /** 選べるクラスコード（差し替え・追加の候補） */
   classCodes: string[];
   /**
-   * 個別のコマを休講にする。**理由は聞かない。**
+   * 個別のコマの枠を空ける。**理由は聞かない。**
    * 1コマずつ理由を入力させると、行事の週は5〜6回ダイアログが出て
    * 週案作成が速くなるどころか遅くなるため（理由は「この日をなくす」でのみ聞く）。
    */
   onCancelSlot: (date: string, period: number, classCode: string) => void;
   onAddSlot: (date: string, period: number, classCode: string, memo: string) => void;
   onCancelWholeDay: (date: string, reason: string) => void;
-  /** 差分を取り消して基本時間割に戻す（休講の解除・追加の取り消し） */
+  /** 差分を取り消して基本時間割に戻す（追加したコマの取り消し） */
   onRestore: (date: string, period: number, classCode: string) => void;
 };
 
@@ -71,8 +70,6 @@ export type SlotPlanHandlers = {
 type Props = {
   plan: WeeklyPlan[];
   weekDates: Date[]; // 月〜土の6日
-  /** 行事・祝日でなくなったコマ。plan とは別配列（時数に数えないため） */
-  cancelled?: CancelledSlot[];
   /** 1コマのインライン編集用コールバック（メモ変更など）。null の場合は閲覧専用。 */
   onMemoChange?: (date: string, period: number, classCode: string, memo: string) => void;
   /** 時間割の変更ハンドラ。渡さなければ編集ボタンを出さない（アーカイブ表示用） */
@@ -95,14 +92,17 @@ type Props = {
  * この形は印刷様式（Y案：月〜土 × 時限のグリッド）とも一致するので、
  * 週案印刷（Phase 13）でそのまま流用できる。
  *
- * **休講コマ（`cancelled`）は打ち消し線で残す。**消してしまうと
- * 「なぜ時数が減ったか」が管理職にも本人にも分からなくなるため（本人決定）。
- * ただし `plan` とは別配列なので、週実施時数には数えられない。
+ * **なくしたコマは何も残さず、空きコマ（「＋」）に戻す。**
+ * 以前は打ち消し線の「休講」カードを残していたが、祝日の多い週は
+ * セルが休講で埋まって読めず、**空いた枠に別クラスを入れることもできなかった**
+ * （本人決定 2026-09-24）。時数の過不足はグリッド上の帯で分かる。
+ *
+ * 消したコマを戻したいときは、その枠の「＋」から同じクラスを選び直す。
+ * `addSlot` は同じコマの既存差分を取り除いてから積むので、元どおりになる。
  */
 export default function WeeklyGrid({
   plan,
   weekDates,
-  cancelled = [],
   edit,
   firstLesson,
   slotPlan,
@@ -124,15 +124,6 @@ export default function WeeklyGrid({
     byCell.set(k, list);
   }
 
-  /** `${date}:${period}` → その枠の休講 */
-  const cancelledByCell = new Map<string, CancelledSlot[]>();
-  for (const c of cancelled) {
-    const k = `${c.date}:${c.period}`;
-    const list = cancelledByCell.get(k) ?? [];
-    list.push(c);
-    cancelledByCell.set(k, list);
-  }
-
   const countByDate = new Map<string, number>();
   for (const p of plan) {
     countByDate.set(p.date, (countByDate.get(p.date) ?? 0) + 1);
@@ -141,7 +132,7 @@ export default function WeeklyGrid({
   /**
    * 各クラスの「その週の最初のコマ」を特定する。
    * 日付・時限順に走査したときのクラスごとの初出。
-   * 休講で月曜が消えれば火曜が最初になる（例外適用後の並びで決まる）。
+   * 月曜の枠を空ければ火曜が最初になる（例外適用後の並びで決まる）。
    */
   const firstSlotKey = new Map<string, string>();
   for (const p of [...plan].sort(
@@ -184,7 +175,7 @@ export default function WeeklyGrid({
                     type="button"
                     onClick={() => {
                       const reason = window.prompt(
-                        `${formatDate(date, "M/D")} の授業をすべて休講にします。理由を入力してください（祝日・行事など）`,
+                        `${formatDate(date, "M/D")} の授業をすべて空けます。理由を入力してください（祝日・行事など）`,
                         ""
                       );
                       if (reason === null) return;
@@ -215,9 +206,8 @@ export default function WeeklyGrid({
             {dateKeys.map((dateKey) => {
               const cellKey = `${dateKey}:${period}`;
               const lessons = byCell.get(cellKey) ?? [];
-              const cancels = cancelledByCell.get(cellKey) ?? [];
               const addKey = `add:${cellKey}`;
-              const isEmpty = lessons.length === 0 && cancels.length === 0;
+              const isEmpty = lessons.length === 0;
 
               return (
                 <div key={cellKey} className="min-w-0">
@@ -267,8 +257,7 @@ export default function WeeklyGrid({
                               onRemove={
                                 canEdit
                                   ? () => {
-                                      // 自分で追加したコマは「休講」にせず追加そのものを取り消す。
-                                      // もともと無かったコマを打ち消し線で残す意味がないため。
+                                      // 自分で追加したコマは、追加そのものを取り消す
                                       if (lesson.is_override) {
                                         edit!.onRestore(
                                           lesson.date,
@@ -288,7 +277,7 @@ export default function WeeklyGrid({
                               removeLabel={
                                 lesson.is_override
                                   ? "追加したこのコマを取り消す"
-                                  : "この時間を休講にする"
+                                  : "この枠を空ける"
                               }
                               open={
                                 canOpen
@@ -332,42 +321,6 @@ export default function WeeklyGrid({
                         );
                       })}
 
-                      {/* 休講：打ち消し線で残す。時数には数えられていない */}
-                      {cancels.map((c) => (
-                        <div
-                          key={`x:${c.date}:${c.period}:${c.class_code}`}
-                          className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            {/*
-                              授業カードの「×」と同じ位置に置く。
-                              同じ場所を押せば「消す ⇄ 戻す」が行き来できる。
-                            */}
-                            {canEdit ? (
-                              <button
-                                type="button"
-                                onClick={() => edit!.onRestore(c.date, c.period, c.class_code)}
-                                aria-label="休講を取り消して元に戻す"
-                                title="休講を取り消して元に戻す"
-                                className="-ml-1 -mt-1 rounded px-1.5 text-sm leading-none text-slate-400 hover:bg-blue-50 hover:text-blue-600"
-                              >
-                                ↩
-                              </button>
-                            ) : (
-                              <span />
-                            )}
-                            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-600">
-                              休講
-                            </span>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-400 line-through">
-                            {c.class_code}
-                          </p>
-                          {c.reason && (
-                            <p className="mt-0.5 text-xs text-slate-500">{c.reason}</p>
-                          )}
-                        </div>
-                      ))}
                     </div>
                   )}
                 </div>

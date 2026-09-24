@@ -99,7 +99,7 @@ function PrintWeeklyContent() {
   const weekDates = getWeekDates(monday);
   const weekNo = getWeekNumber(monday, setting.start_date);
 
-  const { plan, summary, cancelled } = generateWeeklyPlan(
+  const { plan, summary } = generateWeeklyPlan(
     monday,
     setting,
     timetable,
@@ -172,7 +172,6 @@ function PrintWeeklyContent() {
               weekNo={weekNo}
               weekDates={weekDates}
               plan={plan}
-              cancelled={cancelled}
               summary={summary}
               monthlyHours={monthlyHours}
               weekConfirmed={confirmedWeeks.includes(mondayKey)}
@@ -186,7 +185,7 @@ function PrintWeeklyContent() {
             <br />
             週案は実施前に提出するため、紙面には<strong>予定と実施を並べて</strong>います
             （画面の時数表は確定した分だけを出します）。
-            休講にしたコマは打ち消し線と理由つきで印刷され、時数には数えません。
+            空けたコマは何も印刷されず、時数にも数えません。
           </p>
         </div>
       )}

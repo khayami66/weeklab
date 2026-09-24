@@ -182,23 +182,3 @@ export function collectMondaysForMonth(year: number, month: number): Date[] {
   }
   return mondays;
 }
-
-/**
- * クラス別の「いつもの週の時数」を基本時間割から数える。
- *
- * 3年は週2時間、4年は週3時間、という基準は**基本時間割にそのまま入っている**
- * （3-1 が基本時間割に2回あれば基準は2）。設定項目を増やさず、
- * 時間割を直せば基準も自動で追従する。
- *
- * 週内例外（休講・追加）は**反映しない。**この関数が返すのは
- * 「本来この週は何コマあるはずか」であり、実際の予定と比べるための物差し。
- */
-export function computeStandardHoursByClass(
-  timetable: Timetable[]
-): Record<string, number> {
-  const byClass: Record<string, number> = {};
-  for (const t of timetable) {
-    byClass[t.class_code] = (byClass[t.class_code] ?? 0) + 1;
-  }
-  return byClass;
-}

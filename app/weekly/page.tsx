@@ -28,7 +28,7 @@ import {
 } from "@/lib/overrideEdit";
 import { advanceProgress, advanceTotalOnly } from "@/lib/progress";
 import { clearSlotPlan, setSlotPlan } from "@/lib/slotPlanEdit";
-import { computeMonthlyHoursByClass, computeStandardHoursByClass } from "@/lib/summary";
+import { computeMonthlyHoursByClass } from "@/lib/summary";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
 import type { SlotPlanChoice } from "@/components/SlotPlanPicker";
 import type {
@@ -168,7 +168,7 @@ function WeeklyPageContent() {
   const weekDates = getWeekDates(monday);
 
   // 週案生成（保存済みの確定値を使う）
-  const { plan, summary, cancelled } = generateWeeklyPlan(
+  const { plan, summary } = generateWeeklyPlan(
     monday,
     setting,
     timetable,
@@ -198,8 +198,6 @@ function WeeklyPageContent() {
   const weekDateKeys = weekDates.map((d) => formatDate(d, "YYYY-MM-DD"));
   const weekOverrides = overridesInWeek(overrides, weekDateKeys);
   const classCodes = listClassCodes(setting);
-  // 「いつもの週は何コマか」。基本時間割の件数そのもの（設定項目は増やさない）
-  const standardHours = computeStandardHoursByClass(timetable);
 
   const applyOverrides = async (next: typeof overrides, message: string) => {
     try {
@@ -214,18 +212,17 @@ function WeeklyPageContent() {
 
   const editHandlers = {
     classCodes,
-    // 個別のコマは理由を聞かず即休講にする。
+    // 個別のコマは理由を聞かず即座に空ける。
     // 1コマずつ入力させると行事の週で何度もダイアログが出て、週案作成が遅くなるため。
-    // 理由は「この日をなくす」（1日まるごと）でのみ入力する。
     onCancelSlot: (date: string, period: number, code: string) =>
-      applyOverrides(cancelSlot(overrides, date, period, code, ""), "休講にしました"),
+      applyOverrides(cancelSlot(overrides, date, period, code, ""), "枠を空けました"),
     onAddSlot: (date: string, period: number, code: string, memo: string) =>
       applyOverrides(addSlot(overrides, date, period, code, memo), "授業を追加しました"),
     onCancelWholeDay: (date: string, reason: string) => {
       const slotsOfDay = plan.filter((pl) => pl.date === date);
       return applyOverrides(
         cancelWholeDay(overrides, date, slotsOfDay, reason),
-        `${date} を休講にしました`
+        `${date} の授業を空けました`
       );
     },
     onRestore: (date: string, period: number, code: string) =>
@@ -477,27 +474,20 @@ function WeeklyPageContent() {
             組み立て中の週の過不足はここでしか分からない
           */}
           <div className="mb-3">
-            <WeekPlanStrip
-              plan={plan}
-              standardHours={standardHours}
-              classCodes={classCodes}
-            />
+            <WeekPlanStrip plan={plan} classCodes={classCodes} />
           </div>
           <WeeklyGrid
             plan={plan}
             weekDates={weekDates}
-            cancelled={cancelled}
             edit={isConfirmedWeek ? undefined : editHandlers}
             firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
             slotPlan={isConfirmedWeek ? undefined : slotPlanHandlers}
           />
           <p className="mt-2 text-xs text-slate-500">
-            枠は月〜土 × 1〜6限で固定です。<strong>空きコマの「＋」から授業を追加</strong>、
-            <strong>コマ左上の「×」でその時間をなくす</strong>（自分で追加したコマは取り消し、
-            いつもの授業は休講）。祝日・行事で1日まるごと動くときは、日付の下の
-            「この日をなくす」で理由をつけて消せます。
-            <strong>休講にしたコマは打ち消し線で残り、週実施時数には数えません。</strong>
-            休講カードの「↩」で元に戻せます。
+            枠は月〜土 × 1〜6限で固定です。<strong>コマ左上の「×」でその枠を空け</strong>、
+            <strong>空いた枠の「＋」から別のクラスを入れられます</strong>。
+            祝日・行事で1日まるごと動くときは、日付の下の「この日をなくす」でまとめて空けられます。
+            空けたコマは週実施時数に数えません。<strong>戻したいときは、その枠の「＋」から同じクラスを選び直してください。</strong>
             <br />
             <strong>どのコマも押すと中身を変えられます</strong>（テストにする／単元を指定する）。
             差し替えたコマは<strong>単元の時数を使わない</strong>ので、次のコマは自動でもとの単元の続きに戻ります。
@@ -526,7 +516,7 @@ function WeeklyPageContent() {
             <strong>週実施</strong>＝この週のコマ数（未確定なら 0）／
             <strong>月実施</strong>＝この週の月曜が属する月のうち、確定済みの週の合計／
             <strong>累計</strong>＝進度管理の累計時数（年度当初からの実施分）。
-            休講にしたコマは数えていません。
+            空けたコマは数えていません。
             {!isConfirmedWeek && (
               <>
                 <br />

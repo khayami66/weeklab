@@ -1,6 +1,5 @@
 import { formatDate } from "@/lib/date";
 import type {
-  CancelledSlot,
   TeacherSetting,
   Weekday,
   WeeklyPlan,
@@ -15,7 +14,6 @@ type Props = {
   weekNo: number;
   weekDates: Date[];
   plan: WeeklyPlan[];
-  cancelled: CancelledSlot[];
   summary: WeekSummary;
   /** class_code → その月の確定済みコマ数 */
   monthlyHours: Record<string, number>;
@@ -45,7 +43,6 @@ export default function PrintWeeklySheet({
   weekNo,
   weekDates,
   plan,
-  cancelled,
   summary,
   monthlyHours,
   weekConfirmed,
@@ -55,12 +52,6 @@ export default function PrintWeeklySheet({
     const k = `${p.date}:${p.period}`;
     byCell.set(k, [...(byCell.get(k) ?? []), p]);
   }
-  const cancelledByCell = new Map<string, CancelledSlot[]>();
-  for (const c of cancelled) {
-    const k = `${c.date}:${c.period}`;
-    cancelledByCell.set(k, [...(cancelledByCell.get(k) ?? []), c]);
-  }
-
   const dateKeys = weekDates.map((d) => formatDate(d, "YYYY-MM-DD"));
   const tallies = summary.class_tallies;
   const month = weekDates[0].getMonth() + 1;
@@ -146,7 +137,6 @@ export default function PrintWeeklySheet({
                 </th>
                 {PERIODS.map((period) => {
                   const lessons = byCell.get(`${dateKey}:${period}`) ?? [];
-                  const cancels = cancelledByCell.get(`${dateKey}:${period}`) ?? [];
                   return (
                     <td
                       key={period}
@@ -197,12 +187,6 @@ export default function PrintWeeklySheet({
                           </div>
                         );
                       })}
-                      {cancels.map((c) => (
-                        <div key={`x${c.class_code}`} className="text-slate-500">
-                          <span className="line-through">{c.class_code}</span> 休講
-                          {c.reason && <div className="text-[7px]">（{c.reason}）</div>}
-                        </div>
-                      ))}
                     </td>
                   );
                 })}

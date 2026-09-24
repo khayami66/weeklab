@@ -15,7 +15,7 @@ type Props = {
    * カード内の余白に収める。
    */
   onRemove?: () => void;
-  /** 「×」の説明（休講にする／追加を取り消す、で意味が変わる） */
+  /** 「×」の説明（枠を空ける／追加を取り消す、で意味が変わる） */
   removeLabel?: string;
   /**
    * カードを押したときにパネルを開く。渡さなければ閲覧専用。
@@ -107,8 +107,8 @@ export default function LessonCard({
               e.stopPropagation();
               onRemove();
             }}
-            aria-label={removeLabel ?? "この時間をなくす"}
-            title={removeLabel ?? "この時間をなくす"}
+            aria-label={removeLabel ?? "この枠を空ける"}
+            title={removeLabel ?? "この枠を空ける"}
             className="-ml-1 -mt-1 rounded px-1.5 text-sm leading-none text-slate-300 hover:bg-rose-50 hover:text-rose-600"
           >
             ×

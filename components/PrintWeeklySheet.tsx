@@ -137,7 +137,10 @@ export default function PrintWeeklySheet({
           {weekDates.map((d, i) => {
             const dateKey = dateKeys[i];
             return (
-              <tr key={dateKey}>
+              // 6日ぶんを**等分して固定する。**授業の量で行の高さが変わると、
+              // 祝日の多い週は空の行が潰れて1日だけ極端に高くなり、
+              // 紙の上で曜日の見当がつかなくなる
+              <tr key={dateKey} style={{ height: `${100 / weekDates.length}%` }}>
                 <th className="border border-emerald-700 bg-emerald-50 px-0.5 py-0.5 text-center align-top text-[9px] font-bold">
                   {WEEKDAYS[i]}
                   <div className="text-[8px] font-normal">{formatDate(d, "M/D")}</div>

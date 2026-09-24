@@ -4,9 +4,11 @@ import {
   cancelSlot,
   cancelWholeDay,
   clearWeekOverrides,
+  dayOffReason,
   overridesInWeek,
   removeOverride,
   replaceSlot,
+  restoreDay,
 } from "@/lib/overrideEdit";
 import type { TimetableOverride } from "@/types";
 
@@ -154,5 +156,43 @@ describe("overridesInWeek / clearWeekOverrides", () => {
     const next = clearWeekOverrides(build(), week);
     expect(next).toHaveLength(1);
     expect(next[0].date).toBe("2026-04-20");
+  });
+});
+
+describe("dayOffReason / restoreDay（この日をなくす）", () => {
+  const day = "2026-09-21";
+  const offWholeDay: TimetableOverride[] = [
+    { date: day, period: 2, original_class_code: "3-1", new_class_code: null, change_type: "cancel", memo: "敬老の日" },
+    { date: day, period: 3, original_class_code: "3-2", new_class_code: null, change_type: "cancel", memo: "敬老の日" },
+    { date: "2026-09-22", period: 1, original_class_code: "4-1", new_class_code: null, change_type: "cancel", memo: "" },
+  ];
+
+  it("その日の理由を返す", () => {
+    expect(dayOffReason(offWholeDay, day)).toBe("敬老の日");
+  });
+
+  it("個別の「×」（理由なし）は理由として扱わない", () => {
+    expect(dayOffReason(offWholeDay, "2026-09-22")).toBe("");
+  });
+
+  it("差分が無い日は空文字", () => {
+    expect(dayOffReason(offWholeDay, "2026-09-23")).toBe("");
+  });
+
+  it("restoreDay はその日の cancel だけ消す（他の日は残る）", () => {
+    const next = restoreDay(offWholeDay, day);
+    expect(next).toHaveLength(1);
+    expect(next[0].date).toBe("2026-09-22");
+  });
+
+  it("restoreDay はその日に追加したコマを消さない", () => {
+    const withAdd: TimetableOverride[] = [
+      ...offWholeDay,
+      { date: day, period: 5, original_class_code: null, new_class_code: "4-4", change_type: "add", memo: "振替" },
+    ];
+    const next = restoreDay(withAdd, day);
+    expect(next.filter((o) => o.date === day)).toEqual([
+      { date: day, period: 5, original_class_code: null, new_class_code: "4-4", change_type: "add", memo: "振替" },
+    ]);
   });
 });

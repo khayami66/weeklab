@@ -138,6 +138,33 @@ export function replaceSlot(
   );
 }
 
+/**
+ * その日を「なくした」理由。
+ *
+ * 「この日をなくす」は、その日の各コマに同じ理由つきの cancel 差分を積む。
+ * ここではその memo を1つ拾って返す（日付ヘッダーに出すため）。
+ * 個別の「×」は理由を聞かないので memo が空になり、""（＝理由なし）を返す。
+ */
+export function dayOffReason(overrides: TimetableOverride[], date: string): string {
+  const withReason = overrides.find(
+    (o) => o.date === date && o.change_type === "cancel" && o.memo !== ""
+  );
+  return withReason?.memo ?? "";
+}
+
+/**
+ * その日の「なくした」ぶんを取り消して、基本時間割に戻す。
+ *
+ * **その日に自分で追加したコマ（add）は残す。**
+ * 祝日に振替授業を入れたあとで押しても、入れた授業が消えないようにするため。
+ */
+export function restoreDay(
+  overrides: TimetableOverride[],
+  date: string
+): TimetableOverride[] {
+  return overrides.filter((o) => !(o.date === date && o.change_type === "cancel"));
+}
+
 /** その週（月〜土の日付集合）に属する差分だけ取り出す */
 export function overridesInWeek(
   overrides: TimetableOverride[],

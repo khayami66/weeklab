@@ -23,8 +23,10 @@ import {
   cancelSlot,
   cancelWholeDay,
   clearWeekOverrides,
+  dayOffReason,
   overridesInWeek,
   removeOverride,
+  restoreDay,
 } from "@/lib/overrideEdit";
 import { advanceProgress, advanceTotalOnly } from "@/lib/progress";
 import { clearSlotPlan, setSlotPlan } from "@/lib/slotPlanEdit";
@@ -227,7 +229,16 @@ function WeeklyPageContent() {
     },
     onRestore: (date: string, period: number, code: string) =>
       applyOverrides(removeOverride(overrides, date, period, code), "元に戻しました"),
+    onRestoreDay: (date: string) =>
+      applyOverrides(restoreDay(overrides, date), `${date} の授業を元に戻しました`),
   };
+
+  /** 日付キー → その日を「なくした」理由（祝日名など）。ヘッダーに出す */
+  const dayOffReasons: Record<string, string> = {};
+  for (const key of weekDateKeys) {
+    const reason = dayOffReason(overrides, key);
+    if (reason !== "") dayOffReasons[key] = reason;
+  }
 
   const handleClearWeek = async () => {
     if (!window.confirm("この週の時間割の変更をすべて取り消して、基本時間割に戻します。よろしいですか？"))
@@ -482,6 +493,7 @@ function WeeklyPageContent() {
             edit={isConfirmedWeek ? undefined : editHandlers}
             firstLesson={isConfirmedWeek ? undefined : firstLessonHandlers}
             slotPlan={isConfirmedWeek ? undefined : slotPlanHandlers}
+            dayOffReasons={dayOffReasons}
           />
           <p className="mt-2 text-xs text-slate-500">
             枠は月〜土 × 1〜6限で固定です。<strong>コマ左上の「×」でその枠を空け</strong>、

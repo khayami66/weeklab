@@ -32,6 +32,8 @@ export type GridEditHandlers = {
   onCancelSlot: (date: string, period: number, classCode: string) => void;
   onAddSlot: (date: string, period: number, classCode: string, memo: string) => void;
   onCancelWholeDay: (date: string, reason: string) => void;
+  /** 「この日をなくす」を取り消す（その日に追加したコマは残す） */
+  onRestoreDay: (date: string) => void;
   /** 差分を取り消して基本時間割に戻す（追加したコマの取り消し） */
   onRestore: (date: string, period: number, classCode: string) => void;
 };
@@ -78,6 +80,11 @@ type Props = {
   firstLesson?: FirstLessonHandlers;
   /** どのコマでも中身を差し替えられるようにする。渡さなければ表示しない */
   slotPlan?: SlotPlanHandlers;
+  /**
+   * 日付キー → その日を「なくした」理由（祝日名など）。
+   * 入っている日は、日付の下に「この日をなくす」の代わりに理由を出す。
+   */
+  dayOffReasons?: Record<string, string>;
   /** 閲覧専用モード（アーカイブ表示用） */
   readOnly?: boolean;
 };
@@ -106,6 +113,7 @@ export default function WeeklyGrid({
   edit,
   firstLesson,
   slotPlan,
+  dayOffReasons = {},
   readOnly,
 }: Props) {
   /** 開いているパネル。`slot:${key}` / `add:${date}:${period}` */
@@ -170,21 +178,44 @@ export default function WeeklyGrid({
                     {count > 0 ? `${count}コマ` : "—"}
                   </span>
                 </div>
-                {canEdit && count > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const reason = window.prompt(
-                        `${formatDate(date, "M/D")} の授業をすべて空けます。理由を入力してください（祝日・行事など）`,
-                        ""
-                      );
-                      if (reason === null) return;
-                      edit!.onCancelWholeDay(dateKey, reason.trim());
-                    }}
-                    className="mt-1 text-xs text-slate-500 underline hover:text-rose-600"
-                  >
-                    この日をなくす
-                  </button>
+                {/*
+                  理由が入っている日は、「この日をなくす」の位置にその理由を出す。
+                  祝日名がカレンダーのように並ぶので、週の形が一目で分かる。
+                */}
+                {dayOffReasons[dateKey] ? (
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-xs font-medium text-amber-700">
+                      {dayOffReasons[dateKey]}
+                    </span>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => edit!.onRestoreDay(dateKey)}
+                        className="text-xs text-slate-400 underline hover:text-blue-600"
+                        title="この日の授業を元に戻す（追加したコマは残ります）"
+                      >
+                        戻す
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  canEdit &&
+                  count > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const reason = window.prompt(
+                          `${formatDate(date, "M/D")} の授業をすべて空けます。理由を入力してください（祝日・行事など）`,
+                          ""
+                        );
+                        if (reason === null) return;
+                        edit!.onCancelWholeDay(dateKey, reason.trim());
+                      }}
+                      className="mt-1 text-xs text-slate-500 underline hover:text-rose-600"
+                    >
+                      この日をなくす
+                    </button>
+                  )
                 )}
               </div>
             );

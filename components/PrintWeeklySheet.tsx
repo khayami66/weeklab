@@ -19,6 +19,12 @@ type Props = {
   monthlyHours: Record<string, number>;
   /** 表示中の週が確定済みか（週実施を出すかの判断） */
   weekConfirmed: boolean;
+  /**
+   * 日付キー → その日を「なくした」理由（祝日名など）。
+   * 画面の日付ヘッダーと同じものを、紙でも曜日の下に出す。
+   * これが無いと、提出物で「なぜこの週は時数が少ないのか」が分からない。
+   */
+  dayOffReasons?: Record<string, string>;
 };
 
 /**
@@ -46,6 +52,7 @@ export default function PrintWeeklySheet({
   summary,
   monthlyHours,
   weekConfirmed,
+  dayOffReasons = {},
 }: Props) {
   const byCell = new Map<string, WeeklyPlan[]>();
   for (const p of plan) {
@@ -131,9 +138,14 @@ export default function PrintWeeklySheet({
             const dateKey = dateKeys[i];
             return (
               <tr key={dateKey}>
-                <th className="border border-emerald-700 bg-emerald-50 px-0.5 py-0.5 text-center text-[9px] font-bold">
+                <th className="border border-emerald-700 bg-emerald-50 px-0.5 py-0.5 text-center align-top text-[9px] font-bold">
                   {WEEKDAYS[i]}
                   <div className="text-[8px] font-normal">{formatDate(d, "M/D")}</div>
+                  {dayOffReasons[dateKey] && (
+                    <div className="mt-0.5 text-[7px] font-normal leading-tight text-slate-700">
+                      {dayOffReasons[dateKey]}
+                    </div>
+                  )}
                 </th>
                 {PERIODS.map((period) => {
                   const lessons = byCell.get(`${dateKey}:${period}`) ?? [];

@@ -13,6 +13,7 @@ import { useTestMasters } from "@/hooks/useTestMasters";
 import { useTimetable } from "@/hooks/useTimetable";
 import { formatDate, getMondayOf, getWeekDates, getWeekNumber, parseISODate } from "@/lib/date";
 import { localDataSource } from "@/lib/datasource/localDataSource";
+import { dayOffReason } from "@/lib/overrideEdit";
 import { computeMonthlyHoursByClass } from "@/lib/summary";
 import { generateWeeklyPlan } from "@/lib/weeklyPlan";
 import type { AnnualPlan, LessonMaster } from "@/types";
@@ -99,6 +100,14 @@ function PrintWeeklyContent() {
   const weekDates = getWeekDates(monday);
   const weekNo = getWeekNumber(monday, setting.start_date);
 
+  /** 日付キー → その日を「なくした」理由。画面のヘッダーと同じものを紙にも出す */
+  const dayOffReasons: Record<string, string> = {};
+  for (const d of weekDates) {
+    const key = formatDate(d, "YYYY-MM-DD");
+    const reason = dayOffReason(overrides, key);
+    if (reason !== "") dayOffReasons[key] = reason;
+  }
+
   const { plan, summary } = generateWeeklyPlan(
     monday,
     setting,
@@ -174,6 +183,7 @@ function PrintWeeklyContent() {
               plan={plan}
               summary={summary}
               monthlyHours={monthlyHours}
+              dayOffReasons={dayOffReasons}
               weekConfirmed={confirmedWeeks.includes(mondayKey)}
             />
           </div>
